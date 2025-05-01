@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "it.einjojo"
-version = "1.2"
+version = "1.4"
 
 val junitVersion = "5.10.2"
 val assertjVersion = "3.25.3"
@@ -23,7 +23,7 @@ repositories {
 
 dependencies {
     api("org.slf4j:slf4j-api:$slf4jVersion")
-    api("redis.clients:jedis:$jedisVersion")
+    compileOnly("redis.clients:jedis:$jedisVersion")
     implementation("com.google.code.gson:gson:$gsonVersion")
     implementation("org.postgresql:postgresql:$postgresDriverVersion")
 

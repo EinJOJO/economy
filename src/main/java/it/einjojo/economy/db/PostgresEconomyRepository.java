@@ -242,4 +242,22 @@ public class PostgresEconomyRepository implements EconomyRepository {
             throw new RepositoryException("Failed to upsert/set balance for UUID: " + playerUuid, e);
         }
     }
+
+    /**
+     * Getter
+     *
+     * @return The name of the table to use for storing account data.
+     */
+    public String getTableName() {
+        return tableName;
+    }
+
+    /**
+     * Getter
+     *
+     * @return The {@link ConnectionProvider} used by this repository.
+     */
+    public ConnectionProvider getConnectionProvider() {
+        return connectionProvider;
+    }
 }
