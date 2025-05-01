@@ -50,15 +50,14 @@ public class RedisNotifier {
      * @param change     The amount that was added (positive) or removed (negative).
      * @throws NotificationException If publishing fails (optional, depending on desired error handling).
      */
-    public void publishUpdate(UUID playerUuid, double newBalance, double change) /*throws NotificationException*/ {
+    public void publishUpdate(UUID playerUuid, double newBalance, double change) throws NotificationException {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
 
         JsonObject payload = new JsonObject();
         payload.addProperty("uuid", playerUuid.toString());
         payload.addProperty("newBalance", newBalance);
         payload.addProperty("change", change);
-        // Optional: Add timestamp, server ID, transaction type etc.
-        // payload.addProperty("timestamp", System.currentTimeMillis());
+        payload.addProperty("timestamp", System.currentTimeMillis());
 
         String message = gson.toJson(payload);
 
