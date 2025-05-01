@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "it.einjojo"
-version = "1.0" // Der artifactId wird standardmäßig der Projektname sein
+version = "1.1" // Der artifactId wird standardmäßig der Projektname sein
 
 val junitVersion = "5.10.2"
 val assertjVersion = "3.25.3"
@@ -23,7 +23,7 @@ repositories {
 
 dependencies {
     api("org.slf4j:slf4j-api:$slf4jVersion")
-    implementation("redis.clients:jedis:$jedisVersion")
+    api("redis.clients:jedis:$jedisVersion")
     implementation("com.google.code.gson:gson:$gsonVersion")
     implementation("org.postgresql:postgresql:$postgresDriverVersion")
 
@@ -90,7 +90,14 @@ publishing {
         }
     }
     repositories {
-
+        maven {
+            name = "einjojoReleases"
+            url = uri("https://repo.einjojo.it/releases")
+            credentials(PasswordCredentials::class)
+            authentication {
+                create<BasicAuthentication>("basic")
+            }
+        }
     }
 }
 
