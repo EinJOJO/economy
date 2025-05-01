@@ -3,7 +3,7 @@ package it.einjojo.economy.base;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import it.einjojo.economy.db.ConnectionProvider;
-import it.einjojo.economy.db.PostgresEconomyRepository; // Import the repository
+import it.einjojo.economy.db.PostgresEconomyRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -14,8 +14,8 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPooled;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -86,10 +86,10 @@ public abstract class AbstractIntegrationTest {
         log.info("Setting up Redis connection pool...");
         String redisHost = redisContainer.getHost();
         Integer redisPort = redisContainer.getMappedPort(6379);
-        testJedisPool = new JedisPooled(redisHost, redisPort);
+        testJedisPool = new JedisPool(redisHost, redisPort);
         // Test connection
-        try {
-            String pingResponse = testJedisPool.ping();
+        try (Jedis jedis = testJedisPool.getResource()) {
+            String pingResponse = jedis.ping();
             log.info("Redis connection successful. PING response: {}. Host: {}:{}", pingResponse, redisHost, redisPort);
         } catch (Exception e) {
             log.error("Failed to connect to Testcontainers Redis instance", e);
