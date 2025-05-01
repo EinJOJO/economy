@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPubSub;
 
 import java.util.UUID;
@@ -65,7 +65,7 @@ public class RedisNotifierIntegrationTest extends AbstractIntegrationTest {
                 jedisSub.subscribe(testSubscriber, TEST_CHANNEL);
             } catch (Exception e) {
                 if (!Thread.currentThread().isInterrupted()) {
-                     log.error("Subscriber thread error", e);
+                    log.error("Subscriber thread error", e);
                 }
             }
         });
@@ -119,12 +119,12 @@ public class RedisNotifierIntegrationTest extends AbstractIntegrationTest {
                 .contains("\"change\":" + change);
     }
 
-     @Test
+    @Test
     @DisplayName("publishUpdate handles JedisException gracefully (logs error)")
     void publishUpdate_handlesJedisException() throws InterruptedException {
         // Simulate Redis being down by closing the pool temporarily (for this test only)
-        JedisPooled originalPool = testJedisPool; // Keep original
-        JedisPooled mockDownPool = new JedisPooled("localhost", 12345); // Invalid port
+        JedisPool originalPool = testJedisPool; // Keep original
+        JedisPool mockDownPool = new JedisPool("localhost", 12345); // Invalid port
         RedisNotifier faultyNotifier = new RedisNotifier(mockDownPool, TEST_CHANNEL);
 
         // We expect it to log an error but not throw an exception from publishUpdate itself by default
@@ -132,7 +132,7 @@ public class RedisNotifierIntegrationTest extends AbstractIntegrationTest {
         // A simpler check is that it doesn't throw.
         // And that our original subscriber does NOT receive a message.
         assertThatCode(() -> faultyNotifier.publishUpdate(UUID.randomUUID(), 100, 10))
-            .doesNotThrowAnyException();
+                .doesNotThrowAnyException();
 
         // Verify no message was received on the valid channel
         boolean messageReceived = testSubscriber.awaitMessage(1, TimeUnit.SECONDS);

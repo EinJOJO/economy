@@ -3,10 +3,10 @@ package it.einjojo.economy.redis;
 import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -19,6 +19,7 @@ import java.util.Objects;
  */
 public class RedisTransactionObserver implements Closeable {
     private static final Gson GSON = new Gson();
+
     private static final Logger log = LoggerFactory.getLogger(RedisTransactionObserver.class);
     /**
      * List of registered listeners to be notified of transactions.
@@ -31,20 +32,24 @@ public class RedisTransactionObserver implements Closeable {
     /**
      * The Jedis Pub/Sub handler instance.
      */
-    private final PubSub pubSub;
+    private PubSub pubSub;
+    private Jedis jedis;
 
     /**
      * Constructs a RedisTransactionObserver, which can be used to listen for transaction notifications.
      *
-     * @param notifier Notifier instance for channel name and providing a single jedis instance
+     * @param jedis   The Jedis client instance to use for subscription. Must not be null.
+     * @param channel The Redis channel to subscribe to. Must not be null or empty.
      */
-    public RedisTransactionObserver(RedisNotifier notifier) {
-        Objects.requireNonNull(notifier, "Jedis cannot be null");
+    public RedisTransactionObserver(Jedis jedis, String channel) {
+        Objects.requireNonNull(jedis, "Jedis cannot be null");
+        Objects.requireNonNull(channel, "Channel cannot be null");
+        this.jedis = jedis;
         this.pubSub = new PubSub(this);
         // Create and start the listener thread
         this.listenerThread = new Thread(() -> {
             try {
-                notifier.getJedisPool().subscribe(pubSub, notifier.getPubSubChannel());
+                jedis.subscribe(pubSub, channel);
             } catch (Exception e) {
                 // Log errors unless the thread was interrupted (expected during close)
                 if (!Thread.currentThread().isInterrupted()) {
@@ -129,21 +134,24 @@ public class RedisTransactionObserver implements Closeable {
     /**
      * Closes the observer, unsubscribing from Redis and stopping the listener thread.
      * Attempts to gracefully shut down the background thread.
-     *
      */
     @Override
-    public void close()  {
+    public void close() {
         log.info("Closing RedisTransactionObserver...");
         try {
             // Unsubscribe from all channels
             if (pubSub != null && pubSub.isSubscribed()) {
                 pubSub.unsubscribe();
             }
+            jedis.close();
         } catch (Exception e) {
             log.warn("Exception during Jedis unsubscribe", e);
             // Ignore exceptions during unsubscribing, as the connection might already be closed
+        } finally {
+            pubSub = null;
+            jedis = null;
         }
-
+        listener.clear(); // deref listeners to allow GC
         // Interrupt and join the listener thread
         if (listenerThread != null && listenerThread.isAlive()) {
             listenerThread.interrupt(); // Signal the thread to stop

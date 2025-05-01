@@ -14,6 +14,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
 
 import java.sql.Connection;
@@ -48,7 +49,7 @@ public abstract class AbstractIntegrationTest {
 
     protected static ConnectionProvider testConnectionProvider;
     private static HikariDataSource dataSource; // Keep HikariDataSource to close it
-    protected static JedisPooled testJedisPool;
+    protected static JedisPool testJedisPool;
 
 
     @BeforeAll

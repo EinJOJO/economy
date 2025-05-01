@@ -5,7 +5,8 @@ import com.google.gson.JsonObject;
 import it.einjojo.economy.exception.NotificationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.util.Objects;
@@ -20,7 +21,7 @@ public class RedisNotifier {
     private static final Logger log = LoggerFactory.getLogger(RedisNotifier.class);
     private static final Gson gson = new Gson();
 
-    private final JedisPooled jedisPool;
+    private final JedisPool jedisPool;
     private final String pubSubChannel;
 
     /**
@@ -29,7 +30,7 @@ public class RedisNotifier {
      * @param jedisPool     The pooled Jedis client instance. Must not be null.
      * @param pubSubChannel The Redis channel name to publish updates to. Must not be null or empty.
      */
-    public RedisNotifier(JedisPooled jedisPool, String pubSubChannel) {
+    public RedisNotifier(JedisPool jedisPool, String pubSubChannel) {
         this.jedisPool = Objects.requireNonNull(jedisPool, "jedisPool cannot be null");
         this.pubSubChannel = Objects.requireNonNull(pubSubChannel, "pubSubChannel cannot be null");
         if (pubSubChannel.isBlank()) {
@@ -56,9 +57,9 @@ public class RedisNotifier {
         JsonObject payload = new TransactionPayload(playerUuid, newBalance, change, System.currentTimeMillis()).toJson();
         String message = gson.toJson(payload);
 
-        try {
+        try (Jedis jedis = jedisPool.getResource()) {
             log.debug("Publishing to Redis channel '{}': {}", pubSubChannel, message);
-            long receivers = jedisPool.publish(pubSubChannel, message);
+            long receivers = jedis.publish(pubSubChannel, message);
             log.debug("Published update for UUID {} to {} receiver(s).", playerUuid, receivers);
         } catch (JedisException e) {
             // Log error, decide whether to rethrow or just warn
@@ -77,14 +78,6 @@ public class RedisNotifier {
         return pubSubChannel;
     }
 
-    /**
-     * Get the underlying Jedis pool.
-     *
-     * @return The underlying Jedis pool.
-     */
-    public JedisPooled getJedisPool() {
-        return jedisPool;
-    }
 
     /**
      * Factory method for creating a new RedisTransactionObserver instance using this instance of RedisNotifier.
@@ -92,7 +85,7 @@ public class RedisNotifier {
      * @return new instance
      */
     public RedisTransactionObserver createTransactionObserver() {
-        return new RedisTransactionObserver(this);
+        return new RedisTransactionObserver(jedisPool.getResource(), pubSubChannel);
     }
 
     /**
