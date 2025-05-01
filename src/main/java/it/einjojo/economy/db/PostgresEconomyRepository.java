@@ -27,7 +27,8 @@ public class PostgresEconomyRepository implements EconomyRepository {
             END;
             $$ language 'plpgsql';
             """;
-    private static final String DEFAULT_TABLE_NAME = "player_balances";
+    public static final String DEFAULT_TABLE_NAME = "player_balances";
+    private final String tableName;
     private final ConnectionProvider connectionProvider;
     private final String createTableSql;
     private final String createTriggerSql;
@@ -57,7 +58,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
         if (tableName.isBlank()) {
             throw new IllegalArgumentException("tableName cannot be empty");
         }
-        // ** FIX: Changed BINARY(16) to UUID **
+        this.tableName = tableName;
         createTableSql = """
                 CREATE TABLE IF NOT EXISTS %s (
                     uuid UUID PRIMARY KEY,
@@ -105,29 +106,21 @@ public class PostgresEconomyRepository implements EconomyRepository {
 
     @Override
     public void ensureSchemaExists() throws RepositoryException {
-        log.info("Ensuring database schema for '{}' exists...", DEFAULT_TABLE_NAME);
-        // Using try-with-resources for Connection and Statement
+        log.info("Ensuring database schema for '{}' exists...", tableName);
         try (Connection conn = connectionProvider.getConnection();
              Statement stmt = conn.createStatement()) {
-
-            // Create Table
             log.debug("Executing: {}", createTableSql);
             stmt.execute(createTableSql);
-            log.info("Table '{}' ensured.", DEFAULT_TABLE_NAME);
-
-            // Optional: Create update trigger function and trigger (idempotent setup)
-            // It's often better to manage schema migrations separately, but for simplicity:
+            log.info("Table '{}' ensured.", tableName);
             try {
                 log.debug("Ensuring updated_at trigger function exists...");
                 stmt.execute(CREATE_TRIGGER_FN_SQL);
                 log.debug("Ensuring updated_at trigger exists...");
                 stmt.execute(createTriggerSql);
-                log.info("Trigger 'trigger_{}_updated_at' ensured.", DEFAULT_TABLE_NAME);
+                log.info("Trigger 'trigger_{}_updated_at' ensured.", tableName);
             } catch (SQLException e) {
-                // Log potentially benign errors like function/trigger already exists if not handled by CREATE OR REPLACE/DROP IF EXISTS
                 log.warn("Could not ensure trigger setup (might be permissions or syntax issue, or already exists): {}", e.getMessage());
             }
-
         } catch (SQLException e) {
             log.error("Failed to ensure database schema", e);
             throw new RepositoryException("Failed to ensure database schema", e);
@@ -140,14 +133,10 @@ public class PostgresEconomyRepository implements EconomyRepository {
         log.debug("Finding account data for UUID: {}", playerUuid);
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(findAccountSql)) {
-
-            // ** FIX: Use setObject for UUID **
             ps.setObject(1, playerUuid);
-
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     AccountData data = new AccountData(
-                            // ** FIX: Use getObject for UUID **
                             rs.getObject("uuid", UUID.class),
                             rs.getDouble("balance"),
                             rs.getLong("version")
@@ -169,17 +158,13 @@ public class PostgresEconomyRepository implements EconomyRepository {
     public double upsertAndIncrementBalance(UUID playerUuid, double amount) throws RepositoryException {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         if (amount <= 0) {
-            // Repository level validation for core constraints
             throw new IllegalArgumentException("Amount to increment must be positive: " + amount);
         }
         log.debug("Upserting and incrementing balance for UUID: {} by amount: {}", playerUuid, amount);
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(upsertIncrementSql)) {
-
-            // ** FIX: Use setObject for UUID **
             ps.setObject(1, playerUuid);
-            ps.setDouble(2, amount); // Amount to insert/add
-
+            ps.setDouble(2, amount);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     double newBalance = rs.getDouble(1);
@@ -201,7 +186,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
     @Override
     public boolean updateBalanceConditional(UUID playerUuid, double newBalance, long expectedVersion) throws RepositoryException {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
-        // Basic validation at the repository level
+        // Basic validation
         if (newBalance < 0) {
             throw new IllegalArgumentException("New balance cannot be negative: " + newBalance);
         }
@@ -211,18 +196,14 @@ public class PostgresEconomyRepository implements EconomyRepository {
              PreparedStatement ps = conn.prepareStatement(updateConditionalSql)) {
 
             ps.setDouble(1, newBalance);
-            // ** FIX: Use setObject for UUID **
             ps.setObject(2, playerUuid);
             ps.setLong(3, expectedVersion);
-
             int rowsAffected = ps.executeUpdate();
-
             if (rowsAffected == 1) {
                 log.debug("Conditional update successful for UUID: {}", playerUuid);
                 return true;
             } else {
                 log.debug("Conditional update failed for UUID: {} (rows affected: {}). Expected version: {}", playerUuid, rowsAffected, expectedVersion);
-                // Could be version mismatch or record deleted concurrently
                 return false;
             }
         } catch (SQLException e) {
@@ -236,18 +217,14 @@ public class PostgresEconomyRepository implements EconomyRepository {
     public double upsertAndSetBalance(UUID playerUuid, double amount) throws RepositoryException {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         if (amount < 0) {
-            // Repository level validation for core constraints
             throw new IllegalArgumentException("Amount to set must be non-negative: " + amount);
         }
         log.debug("Upserting and setting balance for UUID: {} to amount: {}", playerUuid, amount);
 
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(upsertSetSql)) {
-
-            // ** FIX: Use setObject for UUID **
             ps.setObject(1, playerUuid);
-            ps.setDouble(2, amount); // The absolute balance to set
-
+            ps.setDouble(2, amount);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     double newBalance = rs.getDouble(1);
