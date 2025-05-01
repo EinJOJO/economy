@@ -28,39 +28,6 @@ public record TransactionPayload(UUID uuid, double newBalance, double change, lo
         return payload;
     }
 
-    /**
-     * Deserializes a JSON object into a RedisTransactionPayload.
-     *
-     * @param payload The JSON object to deserialize. Must not be null
-     * @return A RedisTransactionPayload instance.
-     * @throws IllegalArgumentException if the payload is invalid or missing required properties.
-     */
-    public static TransactionPayload fromJson(JsonObject payload) {
-        if (payload == null) {
-            throw new IllegalArgumentException("Payload cannot be null.");
-        }
-        if (!payload.has("uuid")) {
-            throw new IllegalArgumentException("Payload must contain a 'uuid' property.");
-        }
-        if (!payload.has("newBalance")) {
-            throw new IllegalArgumentException("Payload must contain a 'newBalance' property.");
-        }
-        if (!payload.has("change")) {
-            throw new IllegalArgumentException("Payload must contain a 'change' property.");
-        }
-        if (!payload.has("timestamp")) {
-            throw new IllegalArgumentException("Payload must contain a 'timestamp' property.");
-        }
-        try {
-            UUID uuid = UUID.fromString(payload.get("uuid").getAsString());
-            double newBalance = payload.get("newBalance").getAsDouble();
-            double change = payload.get("change").getAsDouble();
-            long timestamp = payload.get("timestamp").getAsLong();
-            return new TransactionPayload(uuid, newBalance, change, timestamp);
 
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid payload format.", e);
-        }
-    }
 
 }

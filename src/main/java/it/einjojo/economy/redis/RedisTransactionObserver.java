@@ -1,11 +1,8 @@
 package it.einjojo.economy.redis;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 
 import java.io.Closeable;
@@ -21,6 +18,7 @@ import java.util.Objects;
  * Implements {@link Closeable} for resource cleanup.
  */
 public class RedisTransactionObserver implements Closeable {
+    private static final Gson GSON = new Gson();
     private static final Logger log = LoggerFactory.getLogger(RedisTransactionObserver.class);
     /**
      * List of registered listeners to be notified of transactions.
@@ -36,23 +34,17 @@ public class RedisTransactionObserver implements Closeable {
     private final PubSub pubSub;
 
     /**
-     * Constructs a new RedisTransactionObserver.
-     * Initializes the Jedis Pub/Sub mechanism and starts a background listener thread.
+     * Constructs a RedisTransactionObserver, which can be used to listen for transaction notifications.
      *
-     * @param providedJedis The Jedis instance to use for subscribing. Must not be null.
-     *                      This instance should be dedicated to the Pub/Sub operation,
-     *                      as the subscribe call is blocking.
-     * @param gson          The Gson instance used for deserializing transaction payloads from JSON.
-     * @throws NullPointerException if providedJedis is null.
+     * @param notifier Notifier instance for channel name and providing a single jedis instance
      */
-    public RedisTransactionObserver(Jedis providedJedis, Gson gson) {
-        Objects.requireNonNull(providedJedis, "Jedis cannot be null");
-        this.pubSub = new PubSub(gson, this);
+    public RedisTransactionObserver(RedisNotifier notifier) {
+        Objects.requireNonNull(notifier, "Jedis cannot be null");
+        this.pubSub = new PubSub(this);
         // Create and start the listener thread
         this.listenerThread = new Thread(() -> {
             try {
-                // Blocking call to subscribe
-                providedJedis.subscribe(pubSub);
+                notifier.getJedisPool().subscribe(pubSub, notifier.getPubSubChannel());
             } catch (Exception e) {
                 // Log errors unless the thread was interrupted (expected during close)
                 if (!Thread.currentThread().isInterrupted()) {
@@ -69,17 +61,14 @@ public class RedisTransactionObserver implements Closeable {
      * Inner class extending JedisPubSub to handle incoming messages.
      */
     private static class PubSub extends JedisPubSub {
-        private final Gson gson;
         private final RedisTransactionObserver observer;
 
         /**
          * Constructs a PubSub handler.
          *
-         * @param gson     The Gson instance for deserialization.
          * @param observer The outer RedisTransactionObserver to notify.
          */
-        private PubSub(Gson gson, RedisTransactionObserver observer) {
-            this.gson = gson;
+        private PubSub(RedisTransactionObserver observer) {
             this.observer = observer;
         }
 
@@ -93,9 +82,7 @@ public class RedisTransactionObserver implements Closeable {
         @Override
         public void onMessage(String channel, String message) {
             try {
-                // Deserialize JSON message to JsonObject first, then to TransactionPayload
-                JsonObject jsonObject = gson.fromJson(message, TypeToken.get(JsonObject.class).getType());
-                TransactionPayload payload = TransactionPayload.fromJson(jsonObject);
+                TransactionPayload payload = GSON.fromJson(message, TransactionPayload.class);
                 observer.notifyListeners(payload);
             } catch (Exception e) {
                 log.error("Failed to process incoming Redis message on channel '{}': {}", channel, message, e);
@@ -143,10 +130,9 @@ public class RedisTransactionObserver implements Closeable {
      * Closes the observer, unsubscribing from Redis and stopping the listener thread.
      * Attempts to gracefully shut down the background thread.
      *
-     * @throws IOException If an I/O error occurs (though typically not expected here).
      */
     @Override
-    public void close() throws IOException {
+    public void close()  {
         log.info("Closing RedisTransactionObserver...");
         try {
             // Unsubscribe from all channels
@@ -155,7 +141,7 @@ public class RedisTransactionObserver implements Closeable {
             }
         } catch (Exception e) {
             log.warn("Exception during Jedis unsubscribe", e);
-            // Ignore exceptions during unsubscribe, as the connection might already be closed
+            // Ignore exceptions during unsubscribing, as the connection might already be closed
         }
 
         // Interrupt and join the listener thread

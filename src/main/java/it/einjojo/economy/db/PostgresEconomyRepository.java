@@ -27,7 +27,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
             END;
             $$ language 'plpgsql';
             """;
-    public static final String DEFAULT_TABLE_NAME = "player_balances";
+    private static final String DEFAULT_TABLE_NAME = "player_balances";
     private final String tableName;
     private final ConnectionProvider connectionProvider;
     private final String createTableSql;

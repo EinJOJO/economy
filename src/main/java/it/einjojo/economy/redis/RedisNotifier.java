@@ -18,7 +18,7 @@ import java.util.UUID;
 public class RedisNotifier {
 
     private static final Logger log = LoggerFactory.getLogger(RedisNotifier.class);
-    private static final Gson gson = new Gson(); // Reusable Gson instance
+    private static final Gson gson = new Gson();
 
     private final JedisPooled jedisPool;
     private final String pubSubChannel;
@@ -66,6 +66,24 @@ public class RedisNotifier {
             // Depending on requirements, you might re-throw:
             // throw new NotificationException("Failed to publish notification for UUID: " + playerUuid, e);
         }
+    }
+
+    /**
+     * Get the Redis channel name to publish updates to.
+     *
+     * @return string
+     */
+    public String getPubSubChannel() {
+        return pubSubChannel;
+    }
+
+    /**
+     * Get the underlying Jedis pool.
+     *
+     * @return The underlying Jedis pool.
+     */
+    public JedisPooled getJedisPool() {
+        return jedisPool;
     }
 
     /**

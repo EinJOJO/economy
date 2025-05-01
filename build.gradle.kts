@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "it.einjojo"
-version = "1.0-SNAPSHOT" // Der artifactId wird standardmäßig der Projektname sein
+version = "1.0" // Der artifactId wird standardmäßig der Projektname sein
 
 val junitVersion = "5.10.2"
 val assertjVersion = "3.25.3"
