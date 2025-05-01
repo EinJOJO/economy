@@ -87,6 +87,15 @@ public class RedisNotifier {
     }
 
     /**
+     * Factory method for creating a new RedisTransactionObserver instance using this instance of RedisNotifier.
+     *
+     * @return new instance
+     */
+    public RedisTransactionObserver createTransactionObserver() {
+        return new RedisTransactionObserver(this);
+    }
+
+    /**
      * Closes the underlying Jedis pool. Call this during application shutdown.
      */
     public void close() {
