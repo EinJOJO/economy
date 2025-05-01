@@ -53,12 +53,7 @@ public class RedisNotifier {
     public void publishUpdate(UUID playerUuid, double newBalance, double change) throws NotificationException {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
 
-        JsonObject payload = new JsonObject();
-        payload.addProperty("uuid", playerUuid.toString());
-        payload.addProperty("newBalance", newBalance);
-        payload.addProperty("change", change);
-        payload.addProperty("timestamp", System.currentTimeMillis());
-
+        JsonObject payload = new TransactionPayload(playerUuid, newBalance, change, System.currentTimeMillis()).toJson();
         String message = gson.toJson(payload);
 
         try {
