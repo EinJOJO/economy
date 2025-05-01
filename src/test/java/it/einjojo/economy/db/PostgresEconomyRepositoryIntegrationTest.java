@@ -1,8 +1,6 @@
 package it.einjojo.economy.db;
 
 import it.einjojo.economy.base.AbstractIntegrationTest;
-import it.einjojo.economy.exception.RepositoryException;
-import it.einjojo.economy.util.UUIDUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

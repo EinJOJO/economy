@@ -90,7 +90,12 @@ public class AsyncEconomyService implements EconomyService {
                 });
     }
 
-    @Override
+
+    /**
+     * Initializes the service by creating the necessary tables and schema if necessary.
+     *
+     * @return A CompletableFuture that completes when the service is ready to accept requests.
+     */
     public CompletableFuture<Void> initialize() {
         log.info("Initializing Economy Service asynchronously...");
         // Run ensureSchemaExists on the DB executor

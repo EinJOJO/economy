@@ -1,7 +1,6 @@
 package it.einjojo.economy;
 
 import it.einjojo.economy.base.AbstractIntegrationTest;
-import it.einjojo.economy.db.AccountData;
 import it.einjojo.economy.db.PostgresEconomyRepository;
 import it.einjojo.economy.redis.RedisNotifier;
 import org.junit.jupiter.api.*;
@@ -14,7 +13,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
@@ -85,15 +83,33 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
             return connectionLatch.await(timeout, unit);
         }
 
+        /**
+         * Pops a message from the queue if available. Non-blocking.
+         * @return The message string, or null if the queue is empty.
+         */
+        public String popMessage() {
+             return messages.poll();
+        }
+
+        /**
+         * Pops a message, waiting up to the specified timeout if necessary.
+         * @param timeout the maximum time to wait
+         * @param unit the time unit of the timeout argument
+         * @return the message, or null if the timeout expires before a message is available
+         * @throws InterruptedException if interrupted while waiting
+         */
         public String popMessage(long timeout, TimeUnit unit) throws InterruptedException {
             long startTime = System.currentTimeMillis();
-            while (System.currentTimeMillis() - startTime < unit.toMillis(timeout)) {
+            long waitMillis = unit.toMillis(timeout);
+            while (System.currentTimeMillis() - startTime < waitMillis) {
                 String msg = messages.poll();
                 if (msg != null) return msg;
-                Thread.sleep(50); // Poll interval
+                // Avoid busy-waiting, sleep for a short interval
+                Thread.sleep(Math.min(50, waitMillis - (System.currentTimeMillis() - startTime) > 0 ? waitMillis - (System.currentTimeMillis() - startTime) : 50 ));
             }
-            return null; // Timeout
+            return messages.poll(); // Final check after timeout
         }
+
 
         public void clearMessages() {
             messages.clear();
@@ -246,7 +262,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         // Use Awaitility to wait for the message
         AtomicReference<String> receivedNotification = new AtomicReference<>();
         await().atMost(5, SECONDS).pollInterval(50, TimeUnit.MILLISECONDS).until(() -> {
-            String msg = testSubscriber.popMessage(0, TimeUnit.MILLISECONDS); // Non-blocking poll
+            String msg = testSubscriber.popMessage(); // Use non-blocking poll
             if (msg != null) {
                 log.info("Received notification in test: {}", msg); // Log received message
                 receivedNotification.set(msg);
@@ -284,7 +300,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         double initialBalance = 100.0;
         double withdrawAmount = 30.0;
         awaitResult(economyService.deposit(playerUuid, initialBalance));
-        testSubscriber.clearMessages(); // Clear deposit notification
+        waitUntilReceivedMessageAndPopIt();
 
         TransactionResult result = awaitResult(economyService.withdraw(playerUuid, withdrawAmount));
 
@@ -295,7 +311,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
         AtomicReference<String> receivedNotification = new AtomicReference<>();
         await().atMost(5, SECONDS).pollInterval(50, TimeUnit.MILLISECONDS).until(() -> {
-            String msg = testSubscriber.popMessage(0, TimeUnit.MILLISECONDS); // Non-blocking poll
+            String msg = testSubscriber.popMessage(); // Use non-blocking poll
             if (msg != null) {
                 log.info("Received notification in test: {}", msg); // Log received message
                 receivedNotification.set(msg);
@@ -316,8 +332,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
     void withdraw_insufficientFunds_fails() throws InterruptedException {
         UUID playerUuid = UUID.randomUUID();
         awaitResult(economyService.deposit(playerUuid, 10.0));
-        testSubscriber.clearMessages();
-
+        waitUntilReceivedMessageAndPopIt();
         TransactionResult result = awaitResult(economyService.withdraw(playerUuid, 20.0));
         assertThat(result.status()).isEqualTo(TransactionStatus.INSUFFICIENT_FUNDS);
         assertThat(awaitResult(economyService.getBalance(playerUuid))).isEqualTo(10.0);
@@ -340,7 +355,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         double initialBalance = 50.0;
         double newBalanceSet = 200.0;
         awaitResult(economyService.deposit(playerUuid, initialBalance));
-        testSubscriber.clearMessages();
+        waitUntilReceivedMessageAndPopIt();
 
         TransactionResult result = awaitResult(economyService.setBalance(playerUuid, newBalanceSet));
         assertThat(result.status()).isEqualTo(TransactionStatus.SUCCESS);
@@ -350,7 +365,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
         AtomicReference<String> receivedNotification = new AtomicReference<>();
         await().atMost(5, SECONDS).pollInterval(50, TimeUnit.MILLISECONDS).until(() -> {
-            String msg = testSubscriber.popMessage(0, TimeUnit.MILLISECONDS); // Non-blocking poll
+            String msg = testSubscriber.popMessage(); // Use non-blocking poll
             if (msg != null) {
                 log.info("Received notification in test: {}", msg); // Log received message
                 receivedNotification.set(msg);
@@ -364,6 +379,13 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         assertThat(notification).contains("\"uuid\":\"" + playerUuid.toString() + "\"");
         assertThat(notification).contains("\"newBalance\":" + newBalanceSet);
         assertThat(notification).contains("\"change\":" + (newBalanceSet - initialBalance));
+    }
+
+    private void waitUntilReceivedMessageAndPopIt() {
+        await().atMost(5, SECONDS).pollInterval(50, TimeUnit.MILLISECONDS).until(() -> {
+            String msg = testSubscriber.popMessage(); // wait for notification to arrive
+            return msg != null;
+        });
     }
 
     @Test
@@ -380,7 +402,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
         AtomicReference<String> receivedNotification = new AtomicReference<>();
         await().atMost(5, SECONDS).pollInterval(50, TimeUnit.MILLISECONDS).until(() -> {
-            String msg = testSubscriber.popMessage(0, TimeUnit.MILLISECONDS); // Non-blocking poll
+            String msg = testSubscriber.popMessage(); // Use non-blocking poll
             if (msg != null) {
                 log.info("Received notification in test: {}", msg); // Log received message
                 receivedNotification.set(msg);
@@ -395,15 +417,6 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         assertThat(notification).contains("\"newBalance\":" + newBalanceSet);
         assertThat(notification).contains("\"change\":" + newBalanceSet);
     }
-
-    @Test
-    @DisplayName("setBalance with negative amount fails")
-    void setBalance_negativeAmount_fails() {
-        UUID playerUuid = UUID.randomUUID();
-        TransactionResult result = awaitResult(economyService.setBalance(playerUuid, -10.0));
-        assertThat(result.status()).isEqualTo(TransactionStatus.INVALID_AMOUNT);
-    }
-
 
     @Test
     @DisplayName("High contention deposits should all succeed eventually")

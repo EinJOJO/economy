@@ -1,6 +1,6 @@
 package it.einjojo.economy.redis;
 
-import com.google.gson.Gson; // Using Gson for JSON serialization
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import it.einjojo.economy.exception.NotificationException;
 import org.slf4j.Logger;

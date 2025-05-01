@@ -1,7 +1,6 @@
 package it.einjojo.economy.db;
 
 import it.einjojo.economy.exception.RepositoryException;
-// Removed: import it.einjojo.economy.util.UUIDUtil; // No longer needed here if UUID type is used
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

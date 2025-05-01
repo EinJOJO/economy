@@ -6,18 +6,10 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Defines the asynchronous API for interacting with the player economy system.
  * All methods involving I/O (database, network) return CompletableFuture
- * to avoid blocking the calling thread (e.g., Minecraft main thread).
+ * to avoid blocking the calling thread.
  */
 public interface EconomyService {
 
-    /**
-     * Asynchronously initializes the economy service, ensuring database schema is ready.
-     * Should be called once before using other methods.
-     *
-     * @return A CompletableFuture that completes when initialization is finished,
-     *         or completes exceptionally if initialization fails.
-     */
-    CompletableFuture<Void> initialize();
 
     /**
      * Asynchronously retrieves the current balance for a given player.
@@ -45,7 +37,7 @@ public interface EconomyService {
      * @param playerUuid The UUID of the player.
      * @param amount     The amount to deposit (must be > 0).
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
-     *         On success, the result contains the new balance.
+     * On success, the result contains the new balance.
      */
     CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount);
 
@@ -58,8 +50,8 @@ public interface EconomyService {
      * @param playerUuid The UUID of the player.
      * @param amount     The amount to withdraw (must be > 0).
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
-     *         On success, the result contains the new balance. FAILED_CONCURRENCY indicates
-     *         optimistic locking failure after retries.
+     * On success, the result contains the new balance. FAILED_CONCURRENCY indicates
+     * optimistic locking failure after retries.
      */
     CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount);
 
@@ -72,7 +64,7 @@ public interface EconomyService {
      * @param playerUuid The UUID of the player.
      * @param amount     The absolute balance to set (must be >= 0).
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
-     *         On success, the result contains the new balance (equal to the amount set).
+     * On success, the result contains the new balance (equal to the amount set).
      */
     CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount);
 
