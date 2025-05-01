@@ -1,7 +1,7 @@
 package it.einjojo.economy.db;
 
 import it.einjojo.economy.exception.RepositoryException;
-import it.einjojo.economy.util.UUIDUtil;
+// Removed: import it.einjojo.economy.util.UUIDUtil; // No longer needed here if UUID type is used
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,9 +58,10 @@ public class PostgresEconomyRepository implements EconomyRepository {
         if (tableName.isBlank()) {
             throw new IllegalArgumentException("tableName cannot be empty");
         }
+        // ** FIX: Changed BINARY(16) to UUID **
         createTableSql = """
                 CREATE TABLE IF NOT EXISTS %s (
-                    uuid BINARY(16) PRIMARY KEY,
+                    uuid UUID PRIMARY KEY,
                     balance DOUBLE PRECISION NOT NULL DEFAULT 0.0,
                     version BIGINT NOT NULL DEFAULT 0,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -141,12 +142,14 @@ public class PostgresEconomyRepository implements EconomyRepository {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(findAccountSql)) {
 
-            ps.setBytes(1, UUIDUtil.uuidToBytes(playerUuid));
+            // ** FIX: Use setObject for UUID **
+            ps.setObject(1, playerUuid);
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     AccountData data = new AccountData(
-                            UUIDUtil.bytesToUuid(rs.getBytes("uuid")), // Could also just use playerUuid
+                            // ** FIX: Use getObject for UUID **
+                            rs.getObject("uuid", UUID.class),
                             rs.getDouble("balance"),
                             rs.getLong("version")
                     );
@@ -174,7 +177,8 @@ public class PostgresEconomyRepository implements EconomyRepository {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(upsertIncrementSql)) {
 
-            ps.setBytes(1, UUIDUtil.uuidToBytes(playerUuid));
+            // ** FIX: Use setObject for UUID **
+            ps.setObject(1, playerUuid);
             ps.setDouble(2, amount); // Amount to insert/add
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -208,7 +212,8 @@ public class PostgresEconomyRepository implements EconomyRepository {
              PreparedStatement ps = conn.prepareStatement(updateConditionalSql)) {
 
             ps.setDouble(1, newBalance);
-            ps.setBytes(2, UUIDUtil.uuidToBytes(playerUuid));
+            // ** FIX: Use setObject for UUID **
+            ps.setObject(2, playerUuid);
             ps.setLong(3, expectedVersion);
 
             int rowsAffected = ps.executeUpdate();
@@ -240,7 +245,8 @@ public class PostgresEconomyRepository implements EconomyRepository {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(upsertSetSql)) {
 
-            ps.setBytes(1, UUIDUtil.uuidToBytes(playerUuid));
+            // ** FIX: Use setObject for UUID **
+            ps.setObject(1, playerUuid);
             ps.setDouble(2, amount); // The absolute balance to set
 
             try (ResultSet rs = ps.executeQuery()) {

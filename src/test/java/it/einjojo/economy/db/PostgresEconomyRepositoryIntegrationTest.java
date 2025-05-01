@@ -201,29 +201,48 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
         Instant firstCreatedAt = getDbTimestamp(playerUuid, "created_at");
         assertThat(firstUpdatedAt).isEqualTo(firstCreatedAt);
 
-        Thread.sleep(50); // Ensure time advances enough for timestamp difference
+        // Introduce a small delay - database timestamp precision might be millisecond level
+        // 50ms should be sufficient on most systems.
+        Thread.sleep(50);
 
         repository.upsertAndIncrementBalance(playerUuid, 5.0); // This update should trigger
 
         Instant secondUpdatedAt = getDbTimestamp(playerUuid, "updated_at");
         Instant secondCreatedAt = getDbTimestamp(playerUuid, "created_at"); // Should remain the same
 
-        assertThat(secondUpdatedAt).isAfter(firstUpdatedAt);
-        assertThat(secondCreatedAt).isEqualTo(firstCreatedAt); // Created_at should not change on update
+        log.info("First updated_at: {}", firstUpdatedAt);
+        log.info("Second updated_at: {}", secondUpdatedAt);
+        log.info("First created_at: {}", firstCreatedAt);
+        log.info("Second created_at: {}", secondCreatedAt);
+
+
+        assertThat(secondUpdatedAt)
+                .as("updated_at timestamp should be updated after modification")
+                .isAfter(firstUpdatedAt);
+        assertThat(secondCreatedAt)
+                .as("created_at timestamp should not change on update")
+                .isEqualTo(firstCreatedAt);
     }
+
 
     private Instant getDbTimestamp(UUID uuid, String columnName) throws SQLException {
         String sql = String.format("SELECT %s FROM player_balances WHERE uuid = ?", columnName);
         try (Connection conn = testConnectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setBytes(1, UUIDUtil.uuidToBytes(uuid));
+            // ** FIX: Use setObject for UUID **
+            ps.setObject(1, uuid);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getTimestamp(1).toInstant();
+                    Timestamp timestamp = rs.getTimestamp(1);
+                    if (timestamp != null) {
+                        return timestamp.toInstant();
+                    } else {
+                        fail("Timestamp column " + columnName + " was null for UUID " + uuid);
+                    }
                 }
             }
         }
-        fail("Could not retrieve timestamp for UUID " + uuid);
+        fail("Could not retrieve timestamp for UUID " + uuid + " and column " + columnName);
         return null; // Should not reach here
     }
 }

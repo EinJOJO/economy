@@ -3,6 +3,7 @@ package it.einjojo.economy.base;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import it.einjojo.economy.db.ConnectionProvider;
+import it.einjojo.economy.db.PostgresEconomyRepository; // Import the repository
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -28,7 +29,6 @@ public abstract class AbstractIntegrationTest {
 
 
     // PostgreSQL Container Configuration
-    // Using a specific stable version is good practice. "latest" can break tests.
     @Container
     public static final PostgreSQLContainer<?> postgreSQLContainer =
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:13-alpine"))
@@ -66,6 +66,20 @@ public abstract class AbstractIntegrationTest {
 
         testConnectionProvider = dataSource::getConnection;
         log.info("PostgreSQL connection pool initialized. URL: {}", postgreSQLContainer.getJdbcUrl());
+
+        // ** FIX: Ensure schema exists once globally after connection provider is ready **
+        try {
+            log.info("Ensuring database schema exists globally for test class...");
+            // Create a temporary repository instance just for schema creation
+            PostgresEconomyRepository initialRepo = new PostgresEconomyRepository(testConnectionProvider);
+            initialRepo.ensureSchemaExists();
+            log.info("Global database schema ensured.");
+        } catch (Exception e) {
+            log.error("FATAL: Failed to ensure global database schema during @BeforeAll", e);
+            // Fail fast if initial schema setup fails, as tests depend on it.
+            throw new RuntimeException("Failed initial schema setup", e);
+        }
+
 
         // --- Redis Setup ---
         log.info("Setting up Redis connection pool...");
@@ -108,17 +122,18 @@ public abstract class AbstractIntegrationTest {
     /**
      * Helper method to clear the player_balances table before each test method if needed.
      * Can be called in @BeforeEach of specific test classes.
+     * Assumes the table has already been created (e.g., in @BeforeAll).
      */
     protected void clearPlayerBalancesTable() {
+        log.debug("Attempting to clear 'player_balances' table..."); // Add log
         try (Connection conn = testConnectionProvider.getConnection();
              Statement stmt = conn.createStatement()) {
             // Using TRUNCATE is fast. RESTART IDENTITY resets sequences if any are used implicitly/explicitly.
             stmt.execute("TRUNCATE TABLE player_balances RESTART IDENTITY CASCADE;");
-            // Ensure the version default is reset if it was ever changed (shouldn't be by app logic)
-            // stmt.execute("ALTER TABLE player_balances ALTER COLUMN version SET DEFAULT 0;");
-            log.debug("Table 'player_balances' truncated.");
+            log.debug("Table 'player_balances' truncated successfully."); // Add success log
         } catch (SQLException e) {
             // Fail fast if table cleanup fails, as it can affect test isolation
+            log.error("Failed to clear player_balances table. Does it exist?", e); // Add error log
             throw new RuntimeException("Failed to clear player_balances table", e);
         }
     }

@@ -139,11 +139,16 @@ public class AsyncEconomyService implements EconomyService {
 
         return supplyAsync(() -> repository.upsertAndIncrementBalance(playerUuid, amount), dbExecutor)
                 .thenCompose(newBalance -> {
-                    // Successfully deposited, now notify asynchronously
-                    runAsync(() -> notifier.publishUpdate(playerUuid, newBalance, amount), notificationExecutor);
+                    log.debug("Deposit success for {}. Scheduling notification...", playerUuid);
+                    runAsync(() -> {
+                        log.debug("Notification task started for deposit UUID: {}", playerUuid);
+                        notifier.publishUpdate(playerUuid, newBalance, amount);
+                        log.debug("Notification task finished for deposit UUID: {}", playerUuid);
+                    }, notificationExecutor);
                     log.info("Deposit successful for {}. Amount: {}. New Balance: {}", playerUuid, amount, newBalance);
                     return CompletableFuture.completedFuture(TransactionResult.success(newBalance, amount));
                 })
+// Add similar logging inside the .thenCompose blocks for setBalance and withdraw where runAsync(notifier...) is called.
                 .exceptionally(ex -> {
                     // Handle exceptions from the repository call
                     log.error("Deposit failed for UUID: {}", playerUuid, ex);
@@ -269,21 +274,7 @@ public class AsyncEconomyService implements EconomyService {
      * executors lies with the provider.
      */
     public void shutdown() {
-        log.info("Shutting down AsyncEconomyService resources...");
-        // Close notifier (which closes its Jedis pool)
-        if (notifier != null) {
-            try {
-                notifier.close();
-            } catch (Exception e) {
-                log.error("Error closing RedisNotifier", e);
-            }
-        }
-        // Shutdown executors ONLY if they are managed internally by this service.
-        // Since they are injected, the caller is responsible for their lifecycle.
-        // Example if managed internally:
-        // shutdownExecutor(dbExecutor);
-        // shutdownExecutor(notificationExecutor);
-        log.info("AsyncEconomyService shutdown complete.");
+        log.info("AsyncEconomyService shutdown actions complete (external resources like executors/pools are NOT closed by this method).");
     }
 
     // Helper for shutting down executors (if they were managed internally)
