@@ -1,7 +1,12 @@
+![Economy API](title.png)
 
 
-This is a java-library that manages an economic balance assigned to UUID. 
+Often I find myself setting up a custom economy on a mineraft server. Thus, I needed a solution that always fits. This is a java-library that manages an economic balance assigned to UUID. 
 It should support float transactions and be multi-instance compatible.
+
+This library needs to be shaded and is not a plugin.
+
+Javadocs: https://economy.javadoc.einjojo.it
 
 ---
 
@@ -46,3 +51,5 @@ _Engineered using Gemini 2.5 Pro_
 
 
     Other Instances (C, D, etc.): Subscribe to the Redis channel. When they receive the messages from A and B, they know the confirmed balance changes and can update their local state/UI accordingly without hitting the database themselves just for notification.
+
+
