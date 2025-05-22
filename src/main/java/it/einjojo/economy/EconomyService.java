@@ -1,5 +1,7 @@
 package it.einjojo.economy;
 
+import it.einjojo.economy.db.EconomyRepository;
+
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -71,6 +73,7 @@ public interface EconomyService {
      */
     CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount, String reason);
 
+    EconomyRepository getRepository();
 
 }
 

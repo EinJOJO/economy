@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.exceptions.JedisException;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -61,7 +60,7 @@ public class RedisNotifier {
             log.debug("Publishing to Redis channel '{}': {}", pubSubChannel, message);
             long receivers = jedis.publish(pubSubChannel, message);
             log.debug("Published update for UUID {} to {} receiver(s).", playerUuid, receivers);
-        } catch (JedisException e) {
+        } catch (Exception e) {
             // Log error, decide whether to rethrow or just warn
             log.error("Failed to publish balance update to Redis channel '{}' for UUID {}", pubSubChannel, playerUuid, e);
             // Depending on requirements, you might re-throw:
@@ -88,13 +87,5 @@ public class RedisNotifier {
         return new RedisTransactionObserver(jedisPool.getResource(), pubSubChannel);
     }
 
-    /**
-     * Closes the underlying Jedis pool. Call this during application shutdown.
-     */
-    public void close() {
-        if (jedisPool != null) {
-            log.info("Closing JedisPool for RedisNotifier.");
-            jedisPool.close();
-        }
-    }
+
 }

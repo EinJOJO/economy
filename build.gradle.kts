@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "it.einjojo"
-version = "1.5.0"
+version = "1.5.2"
 
 val junitVersion = "5.10.2"
 val assertjVersion = "3.25.3"

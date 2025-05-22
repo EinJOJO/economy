@@ -280,6 +280,24 @@ public class AsyncEconomyService implements EconomyService {
     }
 
     /**
+     * GETTER
+     *
+     * @return Repository object
+     */
+    public EconomyRepository getRepository() {
+        return repository;
+    }
+
+    /**
+     * GETTER
+     *
+     * @return Notifier object
+     */
+    public RedisNotifier getNotifier() {
+        return notifier;
+    }
+
+    /**
      * Cleans up resources, like shutting down executors if they were created internally
      * or closing the Redis notifier. This should be called by the application using the library
      * during shutdown. The responsibility of managing the lifecycle of externally provided

@@ -2,7 +2,7 @@ package it.einjojo.economy.db;
 
 import it.einjojo.economy.exception.RepositoryException;
 
-import java.util.List; // Added import
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -98,5 +98,29 @@ public interface EconomyRepository {
      */
     List<LogEntry> getLogEntries(UUID playerUuid, int limit, int page) throws RepositoryException;
 
+    /**
+     * GETTER
+     * Can be useful if you want to make custom queries.
+     *
+     * @return The name of the table used for storing player accounts.
+     */
+    String getEconomyTableName();
+
+
+    /**
+     * GETTER
+     * Can be useful if you want to make custom queries.
+     *
+     * @return A {@link ConnectionProvider} instance used for database connections.
+     */
+    ConnectionProvider getConnectionProvider();
+
+    /**
+     * GETTER
+     * Can be useful if you want to make custom queries.
+     *
+     * @return The name of the table used for storing player log entries.
+     */
+    String getLogTableName();
 }
 
