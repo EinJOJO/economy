@@ -2,6 +2,7 @@ package it.einjojo.economy.db;
 
 import it.einjojo.economy.exception.RepositoryException;
 
+import java.util.List; // Added import
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,11 +40,11 @@ public interface EconomyRepository {
      *
      * @param playerUuid The UUID of the player.
      * @param amount     The positive amount to add to the balance.
-     * @return The new balance after the increment.
+     * @return The {@link AccountData} containing the new balance and version after the increment.
      * @throws RepositoryException      if a database error occurs.
      * @throws IllegalArgumentException if the amount is not positive.
      */
-    double upsertAndIncrementBalance(UUID playerUuid, double amount) throws RepositoryException;
+    AccountData upsertAndIncrementBalance(UUID playerUuid, double amount) throws RepositoryException;
 
 
     /**
@@ -67,11 +68,35 @@ public interface EconomyRepository {
      *
      * @param playerUuid The UUID of the player.
      * @param amount     The absolute balance to set.
-     * @return The new balance after the operation (which is equal to the amount).
+     * @return The {@link AccountData} containing the new balance and version after the operation.
      * @throws RepositoryException      if a database error occurs.
      * @throws IllegalArgumentException if the amount is negative.
      */
-    double upsertAndSetBalance(UUID playerUuid, double amount) throws RepositoryException;
+    AccountData upsertAndSetBalance(UUID playerUuid, double amount) throws RepositoryException;
 
+    /**
+     * Creates a log entry for an economy transaction.
+     * This is a blocking operation.
+     *
+     * @param playerUuid     The UUID of the player.
+     * @param version        The account version against which this log entry is recorded (version after the change).
+     * @param relativeChange The amount by which the balance changed (positive for deposit, negative for withdrawal).
+     * @param reason         The reason for the transaction.
+     * @throws RepositoryException if a database error occurs.
+     */
+    void createLogEntry(UUID playerUuid, long version, double relativeChange, String reason) throws RepositoryException;
+
+    /**
+     * Retrieves a paginated list of log entries for a player, ordered by timestamp descending.
+     * This is a blocking operation.
+     *
+     * @param playerUuid The UUID of the player.
+     * @param limit      The maximum number of log entries to return.
+     * @param page       The page number (1-based).
+     * @return A list of {@link LogEntry} objects.
+     * @throws RepositoryException if a database error occurs.
+     */
+    List<LogEntry> getLogEntries(UUID playerUuid, int limit, int page) throws RepositoryException;
 
 }
+

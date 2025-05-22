@@ -30,30 +30,32 @@ public interface EconomyService {
 
 
     /**
-     * Asynchronously deposits a specified amount into a player's account.
+     * Asynchronously add a specified amount into a player's account.
      * Creates the account if it doesn't exist.
      * Amount must be positive.
      *
      * @param playerUuid The UUID of the player.
      * @param amount     The amount to deposit (must be > 0).
+     * @param reason     The reason for the deposit.
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
      * On success, the result contains the new balance.
      */
-    CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount);
+    CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount, String reason);
 
     /**
-     * Asynchronously withdraws a specified amount from a player's account.
+     * Asynchronously subtract a specified amount from a player's account.
      * The operation will fail if the account does not exist, if the amount is not positive,
      * or if the player has insufficient funds. Uses optimistic locking to handle
      * concurrent modifications, potentially retrying internally.
      *
      * @param playerUuid The UUID of the player.
      * @param amount     The amount to withdraw (must be > 0).
+     * @param reason     The reason for the withdrawal.
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
      * On success, the result contains the new balance. FAILED_CONCURRENCY indicates
      * optimistic locking failure after retries.
      */
-    CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount);
+    CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount, String reason);
 
 
     /**
@@ -63,10 +65,12 @@ public interface EconomyService {
      *
      * @param playerUuid The UUID of the player.
      * @param amount     The absolute balance to set (must be >= 0).
+     * @param reason     The reason for the balance change. Must not be null or empty.
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
      * On success, the result contains the new balance (equal to the amount set).
      */
-    CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount);
+    CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount, String reason);
 
 
 }
+

@@ -132,10 +132,10 @@ public class AsyncEconomyService implements EconomyService {
     }
 
 
-    @Override
-    public CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount) {
+    public CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount, String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
-        log.debug("Requesting deposit for UUID: {} amount: {}", playerUuid, amount);
+        Objects.requireNonNull(reason, "reason cannot be null");
+        log.debug("Requesting deposit for UUID: {} amount: {} reason: {}", playerUuid, amount, reason);
 
         if (amount <= 0) {
             log.warn("Deposit rejected for {}: Invalid amount {}", playerUuid, amount);
@@ -143,48 +143,49 @@ public class AsyncEconomyService implements EconomyService {
         }
 
         return supplyAsync(() -> repository.upsertAndIncrementBalance(playerUuid, amount), dbExecutor)
-                .thenCompose(newBalance -> {
-                    log.debug("Deposit success for {}. Scheduling notification...", playerUuid);
+                .thenCompose(accountData -> {
+                    log.debug("Deposit success for {}. Scheduling notification and logging...", playerUuid);
                     runAsync(() -> {
+                        repository.createLogEntry(playerUuid, accountData.version(), amount, reason);
                         log.debug("Notification task started for deposit UUID: {}", playerUuid);
-                        notifier.publishUpdate(playerUuid, newBalance, amount);
+                        notifier.publishUpdate(playerUuid, accountData.balance(), amount);
                         log.debug("Notification task finished for deposit UUID: {}", playerUuid);
                     }, notificationExecutor);
-                    log.info("Deposit successful for {}. Amount: {}. New Balance: {}", playerUuid, amount, newBalance);
-                    return CompletableFuture.completedFuture(TransactionResult.success(newBalance, amount));
+                    log.info("Deposit successful for {}. Amount: {}. New Balance: {}. Reason: {}", playerUuid, amount, accountData.balance(), reason);
+                    return CompletableFuture.completedFuture(TransactionResult.success(accountData.balance(), amount));
                 })
-// Add similar logging inside the .thenCompose blocks for setBalance and withdraw where runAsync(notifier...) is called.
                 .exceptionally(ex -> {
-                    // Handle exceptions from the repository call
                     log.error("Deposit failed for UUID: {}", playerUuid, ex);
-                    return TransactionResult.error(); // General error
+                    return TransactionResult.error();
                 });
     }
 
-
-    @Override
-    public CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount) {
+    public CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount, String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
-        log.debug("Requesting setBalance for UUID: {} amount: {}", playerUuid, amount);
+        Objects.requireNonNull(reason, "reason cannot be null");
+        log.debug("Requesting setBalance for UUID: {} amount: {} reason: {}", playerUuid, amount, reason);
 
         if (amount < 0) {
             log.warn("SetBalance rejected for {}: Invalid amount {}", playerUuid, amount);
             return CompletableFuture.completedFuture(TransactionResult.invalidAmount());
         }
 
-        // We need the old balance to calculate the 'change' for notification
-        // So, we first find the account, then set, then notify.
         return supplyAsync(() -> repository.findAccountData(playerUuid), dbExecutor)
                 .thenCompose(optionalOldData -> {
                     double oldBalance = optionalOldData.map(AccountData::balance).orElse(0.0);
-                    double change = amount - oldBalance; // Calculate change
+                    // double change = amount - oldBalance; // This was for notification, log will use 'amount' if it's a set operation, or we can log old/new.
+                    // For simplicity, let's log the 'amount' as the change for setBalance, assuming 'reason' clarifies it's a 'set'.
+                    // Or, more accurately, the change is (newBalance - oldBalance)
 
                     return supplyAsync(() -> repository.upsertAndSetBalance(playerUuid, amount), dbExecutor)
-                            .thenCompose(newBalance -> {
-                                // Successfully set, now notify
-                                runAsync(() -> notifier.publishUpdate(playerUuid, newBalance, change), notificationExecutor);
-                                log.info("SetBalance successful for {}. New Balance: {}. Change: {}", playerUuid, newBalance, change);
-                                return CompletableFuture.completedFuture(TransactionResult.success(newBalance, change));
+                            .thenCompose(accountData -> {
+                                double changeForNotificationAndLog = accountData.balance() - oldBalance;
+                                runAsync(() -> {
+                                    repository.createLogEntry(playerUuid, accountData.version(), changeForNotificationAndLog, reason);
+                                    notifier.publishUpdate(playerUuid, accountData.balance(), changeForNotificationAndLog);
+                                }, notificationExecutor);
+                                log.info("SetBalance successful for {}. New Balance: {}. Reason: {}", playerUuid, accountData.balance(), reason);
+                                return CompletableFuture.completedFuture(TransactionResult.success(accountData.balance(), changeForNotificationAndLog));
                             });
                 })
                 .exceptionally(ex -> {
@@ -194,25 +195,25 @@ public class AsyncEconomyService implements EconomyService {
     }
 
 
-    @Override
-    public CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount) {
+    // @NotNull will be handled by Objects.requireNonNull or similar checks
+    public CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount, String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
-        log.debug("Requesting withdrawal for UUID: {} amount: {}", playerUuid, amount);
+        Objects.requireNonNull(reason, "reason cannot be null");
+        log.debug("Requesting withdrawal for UUID: {} amount: {} reason: {}", playerUuid, amount, reason);
 
         if (amount <= 0) {
             log.warn("Withdrawal rejected for {}: Invalid amount {}", playerUuid, amount);
             return CompletableFuture.completedFuture(TransactionResult.invalidAmount());
         }
 
-        // Start the withdrawal attempt process with retries
-        return attemptWithdraw(playerUuid, amount, maxRetries);
+        return attemptWithdraw(playerUuid, amount, reason, maxRetries);
     }
 
     /**
      * Internal recursive helper for withdrawal attempts with optimistic locking retries.
      */
-    private CompletableFuture<TransactionResult> attemptWithdraw(UUID playerUuid, double amount, int retriesLeft) {
-        log.debug("Attempting withdrawal for {} ({} retries left)", playerUuid, retriesLeft);
+    private CompletableFuture<TransactionResult> attemptWithdraw(UUID playerUuid, double amount, String reason, int retriesLeft) {
+        log.debug("Attempting withdrawal for {} ({} retries left), reason: {}", playerUuid, retriesLeft, reason);
 
         // 1. Read the current state (balance and version)
         return supplyAsync(() -> repository.findAccountData(playerUuid), dbExecutor)
@@ -232,14 +233,18 @@ public class AsyncEconomyService implements EconomyService {
 
                     // 3. Calculate new balance
                     double newBalance = currentData.balance() - amount;
+                    long newVersion = currentData.version() + 1; // Anticipate new version for logging
 
                     // 4. Attempt conditional update
                     return supplyAsync(() -> repository.updateBalanceConditional(playerUuid, newBalance, currentData.version()), dbExecutor)
                             .thenComposeAsync(updateSuccess -> {
                                 if (updateSuccess) {
-                                    // 5a. Success: Notify and return result
-                                    runAsync(() -> notifier.publishUpdate(playerUuid, newBalance, -amount), notificationExecutor);
-                                    log.info("Withdrawal successful for {}. Amount: {}. New Balance: {}", playerUuid, amount, newBalance);
+                                    // 5a. Success: Log, Notify and return result
+                                    runAsync(() -> {
+                                        repository.createLogEntry(playerUuid, newVersion, -amount, reason);
+                                        notifier.publishUpdate(playerUuid, newBalance, -amount);
+                                    }, notificationExecutor);
+                                    log.info("Withdrawal successful for {}. Amount: {}. New Balance: {}. Reason: {}", playerUuid, amount, newBalance, reason);
                                     return CompletableFuture.completedFuture(TransactionResult.success(newBalance, -amount));
                                 } else {
                                     // 5b. Failure (Concurrency Conflict or record gone)
@@ -247,15 +252,17 @@ public class AsyncEconomyService implements EconomyService {
                                     if (retriesLeft > 0) {
                                         // Retry after delay
                                         CompletableFuture<TransactionResult> retryFuture = new CompletableFuture<>();
-                                        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(); // Temporary scheduler
-                                        scheduler.schedule(() -> {
-                                            attemptWithdraw(playerUuid, amount, retriesLeft - 1)
-                                                    .whenComplete((res, ex) -> {
-                                                        if (ex != null) retryFuture.completeExceptionally(ex);
-                                                        else retryFuture.complete(res);
-                                                        scheduler.shutdown(); // Clean up scheduler
-                                                    });
-                                        }, retryDelayMillis, TimeUnit.MILLISECONDS);
+                                        // Use try-with-resources for the ScheduledExecutorService
+                                        try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {
+                                            scheduler.schedule(() -> {
+                                                attemptWithdraw(playerUuid, amount, reason, retriesLeft - 1)
+                                                        .whenComplete((res, ex) -> {
+                                                            if (ex != null) retryFuture.completeExceptionally(ex);
+                                                            else retryFuture.complete(res);
+                                                            // scheduler.shutdown(); // No longer needed here, try-with-resources handles it
+                                                        });
+                                            }, retryDelayMillis, TimeUnit.MILLISECONDS);
+                                        }
                                         return retryFuture;
                                     } else {
                                         // Max retries exceeded
@@ -279,21 +286,9 @@ public class AsyncEconomyService implements EconomyService {
      * executors lies with the provider.
      */
     public void shutdown() {
-        log.info("AsyncEconomyService shutdown actions complete (external resources like executors/pools are NOT closed by this method).");
+        log.info("AsyncEconomyService shutdown actions complete (external resources like executors/pools are NOT closed by this method), because it messed up testing");
     }
 
-    // Helper for shutting down executors (if they were managed internally)
-    private void shutdownExecutor(ExecutorService executor) {
-        if (executor != null) {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
+
 }
+

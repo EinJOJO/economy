@@ -12,7 +12,7 @@ val mockitoVersion = "5.11.0"
 val testcontainersVersion = "1.19.7"
 val hikariVersion = "5.1.0"
 val slf4jVersion = "2.0.9"
-val jedisVersion = "5.2.0"
+val jedisVersion = "6.0.0"
 val postgresDriverVersion = "42.7.3"
 val gsonVersion = "2.10.1"
 val awaitilityVersion = "4.2.1"
@@ -25,24 +25,21 @@ dependencies {
     api("org.slf4j:slf4j-api:$slf4jVersion")
     compileOnly("redis.clients:jedis:$jedisVersion")
     implementation("com.google.code.gson:gson:$gsonVersion")
-    implementation("org.postgresql:postgresql:$postgresDriverVersion")
 
-    // --- Testabhängigkeiten ---
+
+
     testImplementation(platform("org.junit:junit-bom:$junitVersion"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:$assertjVersion")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("org.mockito:mockito-junit-jupiter:$mockitoVersion")
 
-    // Testcontainers für Integrationstests
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion") // JUnit 5 Integration
     testImplementation("org.testcontainers:postgresql:$testcontainersVersion")
-    // Redis-Container wird nicht explizit im Code verwendet, aber für Vollständigkeit hinzugefügt
-    // testImplementation("org.testcontainers:redis:$testcontainersVersion")
-
-    // HikariCP für ConnectionProvider-Implementierung in Tests
     testImplementation("com.zaxxer:HikariCP:$hikariVersion")
+    testImplementation("org.postgresql:postgresql:${postgresDriverVersion}")
+    testImplementation("redis.clients:jedis:${jedisVersion}")
 
     // SLF4J Simple Logger für Tests (oder Logback, etc.)
     testImplementation("org.slf4j:slf4j-simple:$slf4jVersion")

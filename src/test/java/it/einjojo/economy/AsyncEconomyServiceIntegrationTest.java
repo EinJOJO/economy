@@ -85,16 +85,18 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
         /**
          * Pops a message from the queue if available. Non-blocking.
+         *
          * @return The message string, or null if the queue is empty.
          */
         public String popMessage() {
-             return messages.poll();
+            return messages.poll();
         }
 
         /**
          * Pops a message, waiting up to the specified timeout if necessary.
+         *
          * @param timeout the maximum time to wait
-         * @param unit the time unit of the timeout argument
+         * @param unit    the time unit of the timeout argument
          * @return the message, or null if the timeout expires before a message is available
          * @throws InterruptedException if interrupted while waiting
          */
@@ -105,7 +107,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
                 String msg = messages.poll();
                 if (msg != null) return msg;
                 // Avoid busy-waiting, sleep for a short interval
-                Thread.sleep(Math.min(50, waitMillis - (System.currentTimeMillis() - startTime) > 0 ? waitMillis - (System.currentTimeMillis() - startTime) : 50 ));
+                Thread.sleep(Math.min(50, waitMillis - (System.currentTimeMillis() - startTime) > 0 ? waitMillis - (System.currentTimeMillis() - startTime) : 50));
             }
             return messages.poll(); // Final check after timeout
         }
@@ -125,13 +127,13 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         repository = new PostgresEconomyRepository(testConnectionProvider);
         dbExecutor = Executors.newFixedThreadPool(4, r -> { // Pool for DB tasks
             Thread t = new Thread(r);
-            t.setName("DBExecutor-" + t.threadId());
+            t.setName("DBExecutor-" + t.getId());
             t.setDaemon(true);
             return t;
         });
         notificationExecutor = Executors.newFixedThreadPool(2, r -> { // Smaller pool for notifications
             Thread t = new Thread(r);
-            t.setName("NotificationExecutor-" + t.threadId());
+            t.setName("NotificationExecutor-" + t.getId());
             t.setDaemon(true);
             return t;
         });
@@ -193,7 +195,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
             try {
                 subscriberThread.join(2000); // Wait a bit longer
                 log.info("Subscriber thread joined.");
-                if(subscriberThread.isAlive()){
+                if (subscriberThread.isAlive()) {
                     log.warn("Subscriber thread did not terminate after join.");
                 }
             } catch (InterruptedException e) {
@@ -242,7 +244,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         UUID playerUuid = UUID.randomUUID();
         assertThat(awaitResult(economyService.hasAccount(playerUuid))).isFalse();
 
-        awaitResult(economyService.deposit(playerUuid, 10.0));
+        awaitResult(economyService.deposit(playerUuid, 10.0, "hasAccount-false"));
         assertThat(awaitResult(economyService.hasAccount(playerUuid))).isTrue();
     }
 
@@ -252,14 +254,13 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         UUID playerUuid = UUID.randomUUID();
         double amount = 123.45;
 
-        TransactionResult result = awaitResult(economyService.deposit(playerUuid, amount));
+        TransactionResult result = awaitResult(economyService.deposit(playerUuid, amount, "deposit-adds-and-publish"));
 
         assertThat(result.status()).isEqualTo(TransactionStatus.SUCCESS);
         assertThat(result.newBalance()).hasValue(amount);
         assertThat(result.change()).isEqualTo(amount);
         assertThat(awaitResult(economyService.getBalance(playerUuid))).isEqualTo(amount);
 
-        // Use Awaitility to wait for the message
         AtomicReference<String> receivedNotification = new AtomicReference<>();
         await().atMost(5, SECONDS).pollInterval(50, TimeUnit.MILLISECONDS).until(() -> {
             String msg = testSubscriber.popMessage(); // Use non-blocking poll
@@ -283,10 +284,10 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
     @DisplayName("deposit with invalid (zero or negative) amount fails")
     void deposit_invalidAmount_fails() {
         UUID playerUuid = UUID.randomUUID();
-        TransactionResult resultZero = awaitResult(economyService.deposit(playerUuid, 0.0));
+        TransactionResult resultZero = awaitResult(economyService.deposit(playerUuid, 0.0, "invalid amount"));
         assertThat(resultZero.status()).isEqualTo(TransactionStatus.INVALID_AMOUNT);
 
-        TransactionResult resultNegative = awaitResult(economyService.deposit(playerUuid, -10.0));
+        TransactionResult resultNegative = awaitResult(economyService.deposit(playerUuid, -10.0, "invalid amount"));
         assertThat(resultNegative.status()).isEqualTo(TransactionStatus.INVALID_AMOUNT);
 
         assertThat(awaitResult(economyService.getBalance(playerUuid))).isEqualTo(0.0); // Balance unchanged
@@ -299,10 +300,10 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         UUID playerUuid = UUID.randomUUID();
         double initialBalance = 100.0;
         double withdrawAmount = 30.0;
-        awaitResult(economyService.deposit(playerUuid, initialBalance));
+        awaitResult(economyService.deposit(playerUuid, initialBalance, "withdraw-sufficient-funds-succeeds"));
         waitUntilReceivedMessageAndPopIt();
 
-        TransactionResult result = awaitResult(economyService.withdraw(playerUuid, withdrawAmount));
+        TransactionResult result = awaitResult(economyService.withdraw(playerUuid, withdrawAmount, "withdraw-sufficient-funds-succeeds-notifies"));
 
         assertThat(result.status()).isEqualTo(TransactionStatus.SUCCESS);
         assertThat(result.newBalance()).hasValue(initialBalance - withdrawAmount);
@@ -331,9 +332,9 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
     @DisplayName("withdraw fails for insufficient funds")
     void withdraw_insufficientFunds_fails() throws InterruptedException {
         UUID playerUuid = UUID.randomUUID();
-        awaitResult(economyService.deposit(playerUuid, 10.0));
+        awaitResult(economyService.deposit(playerUuid, 10.0, "withdraw-insufficient-funds-succeeds"));
         waitUntilReceivedMessageAndPopIt();
-        TransactionResult result = awaitResult(economyService.withdraw(playerUuid, 20.0));
+        TransactionResult result = awaitResult(economyService.withdraw(playerUuid, 20.0, "withdraw-insufficient-funds-fails"));
         assertThat(result.status()).isEqualTo(TransactionStatus.INSUFFICIENT_FUNDS);
         assertThat(awaitResult(economyService.getBalance(playerUuid))).isEqualTo(10.0);
         assertThat(testSubscriber.popMessage(200, TimeUnit.MILLISECONDS)).isNull(); // No notification on failure
@@ -343,7 +344,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
     @DisplayName("withdraw fails for non-existent account")
     void withdraw_nonExistentAccount_fails() {
         UUID playerUuid = UUID.randomUUID();
-        TransactionResult result = awaitResult(economyService.withdraw(playerUuid, 10.0));
+        TransactionResult result = awaitResult(economyService.withdraw(playerUuid, 10.0, "fails"));
         assertThat(result.status()).isEqualTo(TransactionStatus.ACCOUNT_NOT_FOUND);
     }
 
@@ -354,10 +355,10 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         UUID playerUuid = UUID.randomUUID();
         double initialBalance = 50.0;
         double newBalanceSet = 200.0;
-        awaitResult(economyService.deposit(playerUuid, initialBalance));
+        awaitResult(economyService.deposit(playerUuid, initialBalance, "setBalance-existing-account-updates"));
         waitUntilReceivedMessageAndPopIt();
 
-        TransactionResult result = awaitResult(economyService.setBalance(playerUuid, newBalanceSet));
+        TransactionResult result = awaitResult(economyService.setBalance(playerUuid, newBalanceSet, "setBalance-existing-account-updates-notifies"));
         assertThat(result.status()).isEqualTo(TransactionStatus.SUCCESS);
         assertThat(result.newBalance()).hasValue(newBalanceSet);
         assertThat(result.change()).isEqualTo(newBalanceSet - initialBalance);
@@ -394,7 +395,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         UUID playerUuid = UUID.randomUUID();
         double newBalanceSet = 75.0;
 
-        TransactionResult result = awaitResult(economyService.setBalance(playerUuid, newBalanceSet));
+        TransactionResult result = awaitResult(economyService.setBalance(playerUuid, newBalanceSet, "setBalance-new-account-creates-notifies"));
         assertThat(result.status()).isEqualTo(TransactionStatus.SUCCESS);
         assertThat(result.newBalance()).hasValue(newBalanceSet);
         assertThat(result.change()).isEqualTo(newBalanceSet); // Change is new balance as old was 0
@@ -420,7 +421,8 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
     @Test
     @DisplayName("High contention deposits should all succeed eventually")
-    @Timeout(20) // Generous timeout for many operations
+    @Timeout(20)
+        // Generous timeout for many operations
     void highContentionDeposits_allSucceed() throws InterruptedException, ExecutionException {
         UUID playerUuid = UUID.randomUUID();
         int numOperations = 200; // Number of concurrent deposits
@@ -432,7 +434,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
         List<CompletableFuture<TransactionResult>> futures = IntStream.range(0, numOperations)
                 .mapToObj(i ->
                         // Directly use economyService.deposit which returns CompletableFuture
-                        economyService.deposit(playerUuid, amountPerOp)
+                        economyService.deposit(playerUuid, amountPerOp, "high-contention-deposit-" + i)
                                 // Add logging on completion for debugging contention issues
                                 .whenComplete((res, ex) -> {
                                     if (ex != null) {

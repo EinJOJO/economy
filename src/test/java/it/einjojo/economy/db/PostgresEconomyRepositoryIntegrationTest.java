@@ -22,10 +22,7 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
     @BeforeEach
     void setUpRepository() {
         repository = new PostgresEconomyRepository(testConnectionProvider);
-        // Ensure schema exists (it also clears/resets defaults if implemented well)
-        // Or, explicitly clear the table:
         clearPlayerBalancesTable();
-        // The ensureSchemaExists needs to be idempotent and safe to call multiple times.
         assertThatCode(() -> repository.ensureSchemaExists())
                 .doesNotThrowAnyException();
     }
@@ -64,7 +61,7 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
         UUID playerUuid = UUID.randomUUID();
         double amount = 100.50;
 
-        double newBalance = repository.upsertAndIncrementBalance(playerUuid, amount);
+        double newBalance = repository.upsertAndIncrementBalance(playerUuid, amount).balance();
         assertThat(newBalance).isEqualTo(amount);
 
         Optional<AccountData> accountData = repository.findAccountData(playerUuid);
@@ -82,7 +79,7 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
         repository.upsertAndIncrementBalance(playerUuid, 50.0); // version 0
 
         double increment = 25.25;
-        double newBalance = repository.upsertAndIncrementBalance(playerUuid, increment);
+        double newBalance = repository.upsertAndIncrementBalance(playerUuid, increment).balance();
         assertThat(newBalance).isEqualTo(50.0 + 25.25);
 
         Optional<AccountData> accountData = repository.findAccountData(playerUuid);
@@ -154,7 +151,7 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
     void upsertAndSetBalance_newAccount_createsCorrectly() {
         UUID playerUuid = UUID.randomUUID();
         double amount = 77.7;
-        double newBalance = repository.upsertAndSetBalance(playerUuid, amount);
+        double newBalance = repository.upsertAndSetBalance(playerUuid, amount).balance();
         assertThat(newBalance).isEqualTo(amount);
 
         Optional<AccountData> accountData = repository.findAccountData(playerUuid);
@@ -171,7 +168,7 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
         repository.upsertAndIncrementBalance(playerUuid, 50.0); // version 0
 
         double newAmount = 88.8;
-        double returnedBalance = repository.upsertAndSetBalance(playerUuid, newAmount);
+        double returnedBalance = repository.upsertAndSetBalance(playerUuid, newAmount).balance();
         assertThat(returnedBalance).isEqualTo(newAmount);
 
         Optional<AccountData> accountData = repository.findAccountData(playerUuid);
@@ -184,7 +181,7 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
     @Test
     @DisplayName("upsertAndSetBalance throws for negative amount")
     void upsertAndSetBalance_invalidAmount_throwsException() {
-         UUID playerUuid = UUID.randomUUID();
+        UUID playerUuid = UUID.randomUUID();
         assertThatThrownBy(() -> repository.upsertAndSetBalance(playerUuid, -0.01))
                 .isInstanceOf(IllegalArgumentException.class);
     }
