@@ -6,7 +6,7 @@ It should support float transactions and be multi-instance compatible.
 
 This library needs to be shaded and is not a plugin.
 
-Javadocs: https://economy.javadoc.einjojo.it
+Javadocs: [https://javadocs.einjojo.it/economy](https://javadocs.einjojo.it/economy/)
 
 ---
 
