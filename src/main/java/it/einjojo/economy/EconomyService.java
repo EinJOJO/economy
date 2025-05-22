@@ -1,6 +1,7 @@
 package it.einjojo.economy;
 
 import it.einjojo.economy.db.EconomyRepository;
+import it.einjojo.economy.redis.RedisNotifier;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -73,7 +74,19 @@ public interface EconomyService {
      */
     CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount, String reason);
 
+    /**
+     * GETTER
+     *
+     * @return The {@link EconomyRepository} used by this service.
+     */
     EconomyRepository getRepository();
+
+    /**
+     * GETTER
+     *
+     * @return The {@link RedisNotifier} used by this service.
+     */
+    RedisNotifier getRedisNotifier();
 
 }
 

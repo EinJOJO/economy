@@ -293,7 +293,7 @@ public class AsyncEconomyService implements EconomyService {
      *
      * @return Notifier object
      */
-    public RedisNotifier getNotifier() {
+    public RedisNotifier getRedisNotifier() {
         return notifier;
     }
 
