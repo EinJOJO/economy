@@ -121,7 +121,7 @@ public abstract class AbstractIntegrationTest {
     }
 
     /**
-     * Helper method to clear the player_balances table before each test method if needed.
+     * Helper method to clear the eco_balances table before each test method if needed.
      * Can be called in @BeforeEach of specific test classes.
      * Assumes the table has already been created (e.g., in @BeforeAll).
      */
@@ -130,11 +130,11 @@ public abstract class AbstractIntegrationTest {
         try (Connection conn = testConnectionProvider.getConnection();
              Statement stmt = conn.createStatement()) {
             // Using TRUNCATE is fast. RESTART IDENTITY resets sequences if any are used implicitly/explicitly.
-            stmt.execute("TRUNCATE TABLE player_balances RESTART IDENTITY CASCADE;");
-            log.debug("Table 'player_balances' truncated successfully."); // Add success log
+            stmt.execute("TRUNCATE TABLE eco_balances RESTART IDENTITY CASCADE;");
+            log.debug("Table 'eco_balances' truncated successfully."); // Add success log
         } catch (SQLException e) {
             // Fail fast if table cleanup fails, as it can affect test isolation
-            log.error("Failed to clear player_balances table. Does it exist?", e); // Add error log
+            log.error("Failed to clear eco_balances table. Does it exist?", e); // Add error log
             throw new RuntimeException("Failed to clear player_balances table", e);
         }
     }

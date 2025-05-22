@@ -5,12 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * PostgreSQL implementation of the {@link EconomyRepository}.
@@ -30,7 +25,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
             END;
             $$ language 'plpgsql';
             """;
-    private static final String DEFAULT_TABLE_PREFIX = "economy";
+    private static final String DEFAULT_TABLE_PREFIX = "eco";
     private final String economyTableName;
     private final String logTableName; // New field for log table name
     private final ConnectionProvider connectionProvider;
@@ -58,16 +53,16 @@ public class PostgresEconomyRepository implements EconomyRepository {
      * Constructs a new PostgresEconomyRepository.
      *
      * @param connectionProvider Provides database connections. Must not be null.
-     * @param tablePrefix          The name of the table to use for storing account data. Must not be null or empty.
+     * @param tablePrefix        The prefix of the table to use for storing account data. Must not be null or empty.
      */
     public PostgresEconomyRepository(ConnectionProvider connectionProvider, String tablePrefix) {
         this.connectionProvider = Objects.requireNonNull(connectionProvider, "connectionProvider cannot be null");
-        Objects.requireNonNull(tablePrefix, "tableName cannot be null");
+        Objects.requireNonNull(tablePrefix, "tablePrefix cannot be null");
         if (tablePrefix.isBlank()) {
             throw new IllegalArgumentException("tablePrefix cannot be empty");
         }
-        this.economyTableName = tablePrefix + "_accounts"; // Consistent naming with _logs
-        this.logTableName = tablePrefix + "_logs"; // Define log table name
+        this.economyTableName = tablePrefix + "_balances";
+        this.logTableName = tablePrefix + "_logs";
 
         createTableSql = """
                 CREATE TABLE IF NOT EXISTS %s (
@@ -131,12 +126,12 @@ public class PostgresEconomyRepository implements EconomyRepository {
 
         // SQL for retrieving log entries
         getLogEntriesSql = """
-            SELECT uuid, version, relative_change, reason, created_at
-            FROM %s
-            WHERE uuid = ?
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?;
-            """.formatted(logTableName);
+                SELECT uuid, version, relative_change, reason, created_at
+                FROM %s
+                WHERE uuid = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?;
+                """.formatted(logTableName);
     }
 
 
@@ -357,6 +352,15 @@ public class PostgresEconomyRepository implements EconomyRepository {
     }
 
     /**
+     * For tests
+     *
+     * @return The name of the trigger function to use for updating the updated_at column.
+     */
+    public String getUpdateTriggerFunctionName() {
+        return "trigger_%s_updated_at".formatted(economyTableName);
+    }
+
+    /**
      * Getter
      *
      * @return The {@link ConnectionProvider} used by this repository.
@@ -365,6 +369,11 @@ public class PostgresEconomyRepository implements EconomyRepository {
         return connectionProvider;
     }
 
+    /**
+     * Getter
+     *
+     * @return The name of the table to use for storing log entries.
+     */
     public String getLogTableName() {
         return logTableName;
     }

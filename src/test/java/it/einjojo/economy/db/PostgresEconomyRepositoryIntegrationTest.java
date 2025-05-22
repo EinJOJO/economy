@@ -34,14 +34,14 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
         try (Connection conn = testConnectionProvider.getConnection()) {
             // Check table
             DatabaseMetaData metaData = conn.getMetaData();
-            try (ResultSet tables = metaData.getTables(null, null, "player_balances", new String[]{"TABLE"})) {
-                assertThat(tables.next()).as("player_balances table should exist").isTrue();
+            try (ResultSet tables = metaData.getTables(null, null, repository.getEconomyTableName(), new String[]{"TABLE"})) {
+                assertThat(tables.next()).as(repository.getEconomyTableName() + " should exist").isTrue();
             }
 
             // Check trigger (PostgreSQL specific query)
-            String checkTriggerSql = "SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_player_balances_updated_at';";
+            String checkTriggerSql = "SELECT 1 FROM pg_trigger WHERE tgname = '" + repository.getUpdateTriggerFunctionName() + "';";
             try (PreparedStatement ps = conn.prepareStatement(checkTriggerSql); ResultSet rs = ps.executeQuery()) {
-                assertThat(rs.next()).as("Trigger 'trigger_player_balances_updated_at' should exist").isTrue();
+                assertThat(rs.next()).as("Trigger '" + repository.getUpdateTriggerFunctionName() + "' should exist").isTrue();
             }
         } catch (SQLException e) {
             fail("Database metadata check failed", e);
@@ -221,10 +221,9 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
 
 
     private Instant getDbTimestamp(UUID uuid, String columnName) throws SQLException {
-        String sql = String.format("SELECT %s FROM player_balances WHERE uuid = ?", columnName);
+        String sql = String.format("SELECT %s FROM %s WHERE uuid = ?", columnName, repository.getEconomyTableName());
         try (Connection conn = testConnectionProvider.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            // ** FIX: Use setObject for UUID **
             ps.setObject(1, uuid);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -238,6 +237,6 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
             }
         }
         fail("Could not retrieve timestamp for UUID " + uuid + " and column " + columnName);
-        return null; // Should not reach here
+        return null;
     }
 }

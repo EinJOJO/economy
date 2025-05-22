@@ -414,7 +414,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
         String notification = receivedNotification.get();
         assertThat(notification).as("Notification message should not be null").isNotNull();
-        assertThat(notification).contains("\"uuid\":\"" + playerUuid.toString() + "\"");
+        assertThat(notification).contains("\"uuid\":\"" + playerUuid + "\"");
         assertThat(notification).contains("\"newBalance\":" + newBalanceSet);
         assertThat(notification).contains("\"change\":" + newBalanceSet);
     }
