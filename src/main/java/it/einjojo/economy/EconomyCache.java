@@ -15,6 +15,12 @@ public interface EconomyCache {
      */
     double getBalance(UUID playerUuid);
 
+    /**
+     * Check if a player is in cache
+     *
+     * @param playerUuid player uuid
+     * @return true if the player is in the cache, false otherwise.
+     */
     boolean isCached(UUID playerUuid);
 
 }
