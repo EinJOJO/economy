@@ -23,6 +23,7 @@ public class AsyncEconomyService implements EconomyService {
     private static final Logger log = LoggerFactory.getLogger(AsyncEconomyService.class);
 
     private final EconomyRepository repository;
+    private EconomyCache syncCache;
     private final RedisNotifier notifier;
     private final ExecutorService dbExecutor; // Executor for blocking DB operations
     private final ExecutorService notificationExecutor; // Optional: Separate executor for notifications
@@ -116,8 +117,17 @@ public class AsyncEconomyService implements EconomyService {
         return supplyAsync(() -> repository.findAccountData(playerUuid), dbExecutor)
                 .thenApply(optionalData -> optionalData.map(AccountData::balance).orElse(0.0))
                 .whenComplete((balance, ex) -> {
-                    if (ex == null) log.debug("Balance retrieved for {}: {}", playerUuid, balance);
+                    if (ex == null) {
+                        log.debug("Balance retrieved for {}: {}", playerUuid, balance);
+                        writeCacheIfAvailable(playerUuid, balance);
+                    }
                 });
+    }
+
+    private void writeCacheIfAvailable(UUID playerUuid, double balance) {
+        if (syncCache != null) {
+            syncCache.cacheBalance(playerUuid, balance);
+        }
     }
 
     @Override
@@ -145,6 +155,7 @@ public class AsyncEconomyService implements EconomyService {
         return supplyAsync(() -> repository.upsertAndIncrementBalance(playerUuid, amount), dbExecutor)
                 .thenCompose(accountData -> {
                     log.debug("Deposit success for {}. Scheduling notification and logging...", playerUuid);
+                    writeCacheIfAvailable(playerUuid, accountData.balance());
                     runAsync(() -> {
                         repository.createLogEntry(playerUuid, accountData.version(), amount, reason);
                         log.debug("Notification task started for deposit UUID: {}", playerUuid);
@@ -185,6 +196,7 @@ public class AsyncEconomyService implements EconomyService {
                                     notifier.publishUpdate(playerUuid, accountData.balance(), changeForNotificationAndLog);
                                 }, notificationExecutor);
                                 log.info("SetBalance successful for {}. New Balance: {}. Reason: {}", playerUuid, accountData.balance(), reason);
+                                writeCacheIfAvailable(playerUuid, accountData.balance());
                                 return CompletableFuture.completedFuture(TransactionResult.success(accountData.balance(), changeForNotificationAndLog));
                             });
                 })
@@ -244,6 +256,7 @@ public class AsyncEconomyService implements EconomyService {
                                         repository.createLogEntry(playerUuid, newVersion, -amount, reason);
                                         notifier.publishUpdate(playerUuid, newBalance, -amount);
                                     }, notificationExecutor);
+                                    writeCacheIfAvailable(playerUuid, newBalance);
                                     log.info("Withdrawal successful for {}. Amount: {}. New Balance: {}. Reason: {}", playerUuid, amount, newBalance, reason);
                                     return CompletableFuture.completedFuture(TransactionResult.success(newBalance, -amount));
                                 } else {
@@ -277,6 +290,15 @@ public class AsyncEconomyService implements EconomyService {
                     log.error("Withdrawal attempt failed unexpectedly for UUID: {}", playerUuid, ex);
                     return TransactionResult.error();
                 });
+    }
+
+    /**
+     * Sets the cache object which will be populated on async database calls
+     *
+     * @param syncCache cache
+     */
+    public void setSyncCache(EconomyCache syncCache) {
+        this.syncCache = syncCache;
     }
 
     /**

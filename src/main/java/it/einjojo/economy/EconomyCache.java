@@ -23,4 +23,11 @@ public interface EconomyCache {
      */
     boolean isCached(UUID playerUuid);
 
+    /**
+     * Write into cache
+     * @param playerUuid uuid
+     * @param balance the balance that should be in cache
+     */
+    void cacheBalance(UUID playerUuid, double balance);
+
 }
