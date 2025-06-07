@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "it.einjojo"
-version = "1.6.1"
+version = "2.0.0"
 
 val junitVersion = "5.10.2"
 val assertjVersion = "3.25.3"
@@ -26,7 +26,7 @@ dependencies {
     compileOnly("redis.clients:jedis:$jedisVersion")
     implementation("com.google.code.gson:gson:$gsonVersion")
 
-
+    compileOnly("org.jetbrains:annotations:26.0.2")
 
     testImplementation(platform("org.junit:junit-bom:$junitVersion"))
     testImplementation("org.junit.jupiter:junit-jupiter")

@@ -1,4 +1,4 @@
-package it.einjojo.economy.redis;
+package it.einjojo.economy.notifier;
 
 import com.google.gson.JsonObject;
 

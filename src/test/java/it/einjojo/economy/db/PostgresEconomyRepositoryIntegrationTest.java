@@ -23,13 +23,13 @@ public class PostgresEconomyRepositoryIntegrationTest extends AbstractIntegratio
     void setUpRepository() {
         repository = new PostgresEconomyRepository(testConnectionProvider);
         clearPlayerBalancesTable();
-        assertThatCode(() -> repository.ensureSchemaExists())
+        assertThatCode(() -> repository.init())
                 .doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName("ensureSchemaExists creates table and trigger")
-    void ensureSchemaExists_createsTableAndTrigger() {
+    void init_createsTableAndTrigger() {
         // Verification logic (check table metadata, check trigger existence)
         try (Connection conn = testConnectionProvider.getConnection()) {
             // Check table

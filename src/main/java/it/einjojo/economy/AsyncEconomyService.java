@@ -3,7 +3,9 @@ package it.einjojo.economy;
 import it.einjojo.economy.db.AccountData;
 import it.einjojo.economy.db.EconomyRepository;
 import it.einjojo.economy.exception.EconomyException;
-import it.einjojo.economy.redis.RedisNotifier;
+import it.einjojo.economy.notifier.JedisNotifier;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,18 +17,18 @@ import java.util.function.Supplier;
 
 /**
  * Asynchronous implementation of the {@link EconomyService}.
- * Orchestrates calls to the {@link EconomyRepository} and {@link RedisNotifier},
+ * Orchestrates calls to the {@link EconomyRepository} and {@link JedisNotifier},
  * ensuring operations are non-blocking for the caller. Handles optimistic locking retries.
  */
 public class AsyncEconomyService implements EconomyService {
 
     private static final Logger log = LoggerFactory.getLogger(AsyncEconomyService.class);
 
-    private final EconomyRepository repository;
-    private EconomyCache syncCache;
-    private final RedisNotifier notifier;
-    private final ExecutorService dbExecutor; // Executor for blocking DB operations
-    private final ExecutorService notificationExecutor; // Optional: Separate executor for notifications
+    private final @NotNull EconomyRepository repository;
+    private @Nullable EconomyCache syncCache;
+    private final @Nullable EconomyNotifier notifier;
+    private final @NotNull ExecutorService dbExecutor; // Executor for blocking DB operations
+    private final @NotNull ExecutorService notificationExecutor; // Optional: Separate executor for notifications
 
     // Configuration for withdrawal retries
     private final int maxRetries;
@@ -37,20 +39,20 @@ public class AsyncEconomyService implements EconomyService {
      * Constructs an AsyncEconomyService.
      *
      * @param repository           The data access repository.
-     * @param notifier             The Redis notification publisher.
+     * @param notifier             notification publisher can be null.
      * @param dbExecutor           An ExecutorService dedicated to running blocking database operations.
      * @param notificationExecutor An ExecutorService for running notification tasks (can be same as dbExecutor).
      * @param maxRetries           Maximum number of retries for withdrawals on concurrency conflicts.
      * @param retryDelayMillis     Delay between retry attempts in milliseconds.
      */
-    public AsyncEconomyService(EconomyRepository repository,
-                               RedisNotifier notifier,
-                               ExecutorService dbExecutor,
-                               ExecutorService notificationExecutor,
+    public AsyncEconomyService(@NotNull EconomyRepository repository,
+                               @Nullable EconomyNotifier notifier,
+                               @NotNull ExecutorService dbExecutor,
+                               @NotNull ExecutorService notificationExecutor,
                                int maxRetries,
                                long retryDelayMillis) {
+        this.notifier = notifier;
         this.repository = Objects.requireNonNull(repository, "repository cannot be null");
-        this.notifier = Objects.requireNonNull(notifier, "notifier cannot be null");
         this.dbExecutor = Objects.requireNonNull(dbExecutor, "dbExecutor cannot be null");
         this.notificationExecutor = Objects.requireNonNull(notificationExecutor, "notificationExecutor cannot be null");
         this.maxRetries = Math.max(0, maxRetries); // Ensure non-negative
@@ -67,7 +69,7 @@ public class AsyncEconomyService implements EconomyService {
      * @param notifier   The Redis notification publisher.
      * @param executor   An ExecutorService for all background tasks.
      */
-    public AsyncEconomyService(EconomyRepository repository, RedisNotifier notifier, ExecutorService executor) {
+    public AsyncEconomyService(@NotNull EconomyRepository repository, @Nullable EconomyNotifier notifier, @NotNull ExecutorService executor) {
         this(repository, notifier, executor, executor, 3, 50); // Default retries/delay
     }
 
@@ -100,7 +102,7 @@ public class AsyncEconomyService implements EconomyService {
     public CompletableFuture<Void> initialize() {
         log.info("Initializing Economy Service asynchronously...");
         // Run ensureSchemaExists on the DB executor
-        return runAsync(repository::ensureSchemaExists, dbExecutor)
+        return runAsync(repository::init, dbExecutor)
                 .whenComplete((res, ex) -> {
                     if (ex != null) {
                         log.error("Economy Service initialization failed!", ex);
@@ -111,7 +113,7 @@ public class AsyncEconomyService implements EconomyService {
     }
 
     @Override
-    public CompletableFuture<Double> getBalance(UUID playerUuid) {
+    public CompletableFuture<Double> getBalance(@NotNull UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         log.debug("Requesting balance for UUID: {}", playerUuid);
         return supplyAsync(() -> repository.findAccountData(playerUuid), dbExecutor)
@@ -131,7 +133,7 @@ public class AsyncEconomyService implements EconomyService {
     }
 
     @Override
-    public CompletableFuture<Boolean> hasAccount(UUID playerUuid) {
+    public CompletableFuture<Boolean> hasAccount(@NotNull UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         log.debug("Checking account existence for UUID: {}", playerUuid);
         return supplyAsync(() -> repository.findAccountData(playerUuid), dbExecutor)
@@ -142,7 +144,7 @@ public class AsyncEconomyService implements EconomyService {
     }
 
 
-    public CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount, String reason) {
+    public CompletableFuture<TransactionResult> deposit(@NotNull UUID playerUuid, double amount, @NotNull String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
         log.debug("Requesting deposit for UUID: {} amount: {} reason: {}", playerUuid, amount, reason);
@@ -171,7 +173,7 @@ public class AsyncEconomyService implements EconomyService {
                 });
     }
 
-    public CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount, String reason) {
+    public CompletableFuture<TransactionResult> setBalance(@NotNull UUID playerUuid, double amount, @NotNull String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
         log.debug("Requesting setBalance for UUID: {} amount: {} reason: {}", playerUuid, amount, reason);
@@ -208,7 +210,7 @@ public class AsyncEconomyService implements EconomyService {
 
 
     // @NotNull will be handled by Objects.requireNonNull or similar checks
-    public CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount, String reason) {
+    public CompletableFuture<TransactionResult> withdraw(@NotNull UUID playerUuid, double amount, @NotNull String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
         log.debug("Requesting withdrawal for UUID: {} amount: {} reason: {}", playerUuid, amount, reason);
@@ -306,7 +308,7 @@ public class AsyncEconomyService implements EconomyService {
      *
      * @return Repository object
      */
-    public EconomyRepository getRepository() {
+    public @NotNull EconomyRepository getRepository() {
         return repository;
     }
 
@@ -315,7 +317,7 @@ public class AsyncEconomyService implements EconomyService {
      *
      * @return Notifier object
      */
-    public RedisNotifier getRedisNotifier() {
+    public EconomyNotifier getNotifier() {
         return notifier;
     }
 

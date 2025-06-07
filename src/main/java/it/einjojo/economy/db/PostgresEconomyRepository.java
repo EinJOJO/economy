@@ -136,7 +136,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
 
 
     @Override
-    public void ensureSchemaExists() throws RepositoryException {
+    public void init() throws RepositoryException {
         log.info("Ensuring database schema for '{}' and '{}' exists...", economyTableName, logTableName);
         try (Connection conn = connectionProvider.getConnection();
              Statement stmt = conn.createStatement()) {
@@ -347,7 +347,6 @@ public class PostgresEconomyRepository implements EconomyRepository {
      *
      * @return The name of the table to use for storing account data.
      */
-    @Override
     public String getEconomyTableName() {
         return economyTableName;
     }
@@ -366,7 +365,6 @@ public class PostgresEconomyRepository implements EconomyRepository {
      *
      * @return The {@link ConnectionProvider} used by this repository.
      */
-    @Override
     public ConnectionProvider getConnectionProvider() {
         return connectionProvider;
     }
@@ -376,7 +374,6 @@ public class PostgresEconomyRepository implements EconomyRepository {
      *
      * @return The name of the table to use for storing log entries.
      */
-    @Override
     public String getLogTableName() {
         return logTableName;
     }

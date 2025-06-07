@@ -21,7 +21,7 @@ public interface EconomyRepository {
      *
      * @throws RepositoryException if schema creation fails.
      */
-    void ensureSchemaExists() throws RepositoryException;
+    void init() throws RepositoryException;
 
     /**
      * Retrieves the account data (balance and version) for a given player.
@@ -98,29 +98,6 @@ public interface EconomyRepository {
      */
     List<LogEntry> getLogEntries(UUID playerUuid, int limit, int page) throws RepositoryException;
 
-    /**
-     * GETTER
-     * Can be useful if you want to make custom queries.
-     *
-     * @return The name of the table used for storing player accounts.
-     */
-    String getEconomyTableName();
 
-
-    /**
-     * GETTER
-     * Can be useful if you want to make custom queries.
-     *
-     * @return A {@link ConnectionProvider} instance used for database connections.
-     */
-    ConnectionProvider getConnectionProvider();
-
-    /**
-     * GETTER
-     * Can be useful if you want to make custom queries.
-     *
-     * @return The name of the table used for storing player log entries.
-     */
-    String getLogTableName();
 }
 

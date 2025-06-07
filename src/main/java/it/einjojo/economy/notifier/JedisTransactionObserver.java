@@ -1,4 +1,4 @@
-package it.einjojo.economy.redis;
+package it.einjojo.economy.notifier;
 
 import com.google.gson.Gson;
 import org.slf4j.Logger;
@@ -17,10 +17,10 @@ import java.util.Objects;
  * when a new transaction message is received. It manages a background thread for the subscription.
  * Implements {@link Closeable} for resource cleanup.
  */
-public class RedisTransactionObserver implements Closeable {
+public class JedisTransactionObserver implements Closeable {
     private static final Gson GSON = new Gson();
 
-    private static final Logger log = LoggerFactory.getLogger(RedisTransactionObserver.class);
+    private static final Logger log = LoggerFactory.getLogger(JedisTransactionObserver.class);
     /**
      * List of registered listeners to be notified of transactions.
      */
@@ -41,7 +41,7 @@ public class RedisTransactionObserver implements Closeable {
      * @param jedis   The Jedis client instance to use for subscription. Must not be null.
      * @param channel The Redis channel to subscribe to. Must not be null or empty.
      */
-    public RedisTransactionObserver(Jedis jedis, String channel) {
+    public JedisTransactionObserver(Jedis jedis, String channel) {
         Objects.requireNonNull(jedis, "Jedis cannot be null");
         Objects.requireNonNull(channel, "Channel cannot be null");
         this.jedis = jedis;
@@ -57,7 +57,7 @@ public class RedisTransactionObserver implements Closeable {
                 }
             }
         });
-        listenerThread.setDaemon(true); // Allow JVM exit even if this thread is running
+        listenerThread.setDaemon(false); //
         listenerThread.start();
         log.info("RedisTransactionObserver initialized.");
     }
@@ -66,14 +66,14 @@ public class RedisTransactionObserver implements Closeable {
      * Inner class extending JedisPubSub to handle incoming messages.
      */
     private static class PubSub extends JedisPubSub {
-        private final RedisTransactionObserver observer;
+        private final JedisTransactionObserver observer;
 
         /**
          * Constructs a PubSub handler.
          *
          * @param observer The outer RedisTransactionObserver to notify.
          */
-        private PubSub(RedisTransactionObserver observer) {
+        private PubSub(JedisTransactionObserver observer) {
             this.observer = observer;
         }
 

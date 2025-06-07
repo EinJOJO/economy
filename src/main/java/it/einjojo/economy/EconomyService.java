@@ -1,7 +1,8 @@
 package it.einjojo.economy;
 
 import it.einjojo.economy.db.EconomyRepository;
-import it.einjojo.economy.redis.RedisNotifier;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -21,7 +22,7 @@ public interface EconomyService {
      * @param playerUuid The UUID of the player.
      * @return A CompletableFuture holding the player's balance.
      */
-    CompletableFuture<Double> getBalance(UUID playerUuid);
+    CompletableFuture<Double> getBalance(@NotNull UUID playerUuid);
 
     /**
      * Asynchronously checks if a player has an account in the economy system.
@@ -29,7 +30,7 @@ public interface EconomyService {
      * @param playerUuid The UUID of the player.
      * @return A CompletableFuture holding true if the account exists, false otherwise.
      */
-    CompletableFuture<Boolean> hasAccount(UUID playerUuid);
+    CompletableFuture<Boolean> hasAccount(@NotNull UUID playerUuid);
 
 
     /**
@@ -43,7 +44,7 @@ public interface EconomyService {
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
      * On success, the result contains the new balance.
      */
-    CompletableFuture<TransactionResult> deposit(UUID playerUuid, double amount, String reason);
+    CompletableFuture<TransactionResult> deposit(@NotNull UUID playerUuid, double amount, @NotNull String reason);
 
     /**
      * Asynchronously subtract a specified amount from a player's account.
@@ -58,7 +59,7 @@ public interface EconomyService {
      * On success, the result contains the new balance. FAILED_CONCURRENCY indicates
      * optimistic locking failure after retries.
      */
-    CompletableFuture<TransactionResult> withdraw(UUID playerUuid, double amount, String reason);
+    CompletableFuture<TransactionResult> withdraw(@NotNull UUID playerUuid, double amount, @NotNull String reason);
 
 
     /**
@@ -72,21 +73,21 @@ public interface EconomyService {
      * @return A CompletableFuture holding the {@link TransactionResult} of the operation.
      * On success, the result contains the new balance (equal to the amount set).
      */
-    CompletableFuture<TransactionResult> setBalance(UUID playerUuid, double amount, String reason);
+    CompletableFuture<TransactionResult> setBalance(@NotNull UUID playerUuid, double amount, @NotNull String reason);
 
     /**
      * GETTER
      *
      * @return The {@link EconomyRepository} used by this service.
      */
-    EconomyRepository getRepository();
+    @NotNull EconomyRepository getRepository();
 
     /**
      * GETTER
      *
-     * @return The {@link RedisNotifier} used by this service.
+     * @return The {@link EconomyNotifier} used by this service.
      */
-    RedisNotifier getRedisNotifier();
+    @Nullable EconomyNotifier getNotifier();
 
 }
 

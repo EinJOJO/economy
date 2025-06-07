@@ -8,25 +8,27 @@ import java.util.UUID;
 public interface EconomyCache {
 
     /**
-     * Will return 0.0 if the player is not in the cache.
+     * Den gecachten Kontostand abfragen.
      *
-     * @param playerUuid player
-     * @return the cached balance or 0.0
+     * @param playerUuid Spieler
+     * @return the cached balance oder 0.0
      */
     double getBalance(UUID playerUuid);
 
     /**
-     * Check if a player is in cache
+     * Prüfe, ob ein Spieler im Cache ist
      *
      * @param playerUuid player uuid
-     * @return true if the player is in the cache, false otherwise.
+     * @return true, wenn der Spieler im Cache ist
      */
     boolean isCached(UUID playerUuid);
 
     /**
-     * Write into cache
+     * Wenn die Instanz an {@link AsyncEconomyService} übergeben wird,
+     * wird bei sämtlichen Operationen in diesen Cache geschrieben.
+     *
      * @param playerUuid uuid
-     * @param balance the balance that should be in cache
+     * @param balance    der neue Kontostand
      */
     void cacheBalance(UUID playerUuid, double balance);
 

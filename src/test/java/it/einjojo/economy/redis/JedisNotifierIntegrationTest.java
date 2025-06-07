@@ -1,6 +1,7 @@
 package it.einjojo.economy.redis;
 
 import it.einjojo.economy.base.AbstractIntegrationTest;
+import it.einjojo.economy.notifier.JedisNotifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,11 +20,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-public class RedisNotifierIntegrationTest extends AbstractIntegrationTest {
+public class JedisNotifierIntegrationTest extends AbstractIntegrationTest {
 
-    private static final Logger log = LoggerFactory.getLogger(RedisNotifierIntegrationTest.class);
+    private static final Logger log = LoggerFactory.getLogger(JedisNotifierIntegrationTest.class);
     private static final String TEST_CHANNEL = "test:economy:updates";
-    private RedisNotifier notifier;
+    private JedisNotifier notifier;
     private Thread subscriberThread;
     private TestSubscriber testSubscriber;
 
@@ -56,7 +57,7 @@ public class RedisNotifierIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUpNotifierAndSubscriber() {
         // testJedisPool is from AbstractIntegrationTest
-        notifier = new RedisNotifier(testJedisPool, TEST_CHANNEL);
+        notifier = new JedisNotifier(testJedisPool, TEST_CHANNEL);
 
         testSubscriber = new TestSubscriber();
         subscriberThread = new Thread(() -> {
@@ -125,7 +126,7 @@ public class RedisNotifierIntegrationTest extends AbstractIntegrationTest {
         // Simulate Redis being down by closing the pool temporarily (for this test only)
         JedisPool originalPool = testJedisPool; // Keep original
         JedisPool mockDownPool = new JedisPool("localhost", 12345); // Invalid port
-        RedisNotifier faultyNotifier = new RedisNotifier(mockDownPool, TEST_CHANNEL);
+        JedisNotifier faultyNotifier = new JedisNotifier(mockDownPool, TEST_CHANNEL);
 
         // We expect it to log an error but not throw an exception from publishUpdate itself by default
         // This requires checking logs or using a spy/mock logger, which can be complex.

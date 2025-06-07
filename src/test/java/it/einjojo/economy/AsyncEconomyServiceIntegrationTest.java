@@ -2,7 +2,7 @@ package it.einjojo.economy;
 
 import it.einjojo.economy.base.AbstractIntegrationTest;
 import it.einjojo.economy.db.PostgresEconomyRepository;
-import it.einjojo.economy.redis.RedisNotifier;
+import it.einjojo.economy.notifier.JedisNotifier;
 import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
 
     private AsyncEconomyService economyService;
     private PostgresEconomyRepository repository;
-    private RedisNotifier notifier;
+    private JedisNotifier notifier;
     private ExecutorService dbExecutor;
     private ExecutorService notificationExecutor;
     private TestRedisSubscriber testSubscriber;
@@ -138,7 +138,7 @@ public class AsyncEconomyServiceIntegrationTest extends AbstractIntegrationTest 
             return t;
         });
 
-        notifier = new RedisNotifier(testJedisPool, TEST_REDIS_CHANNEL);
+        notifier = new JedisNotifier(testJedisPool, TEST_REDIS_CHANNEL);
 
         // Use standard retries for most tests
         economyService = new AsyncEconomyService(repository, notifier, dbExecutor, notificationExecutor, 3, 50L); // Standard retries

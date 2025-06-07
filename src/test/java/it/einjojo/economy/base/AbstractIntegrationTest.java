@@ -73,7 +73,7 @@ public abstract class AbstractIntegrationTest {
             log.info("Ensuring database schema exists globally for test class...");
             // Create a temporary repository instance just for schema creation
             PostgresEconomyRepository initialRepo = new PostgresEconomyRepository(testConnectionProvider);
-            initialRepo.ensureSchemaExists();
+            initialRepo.init();
             log.info("Global database schema ensured.");
         } catch (Exception e) {
             log.error("FATAL: Failed to ensure global database schema during @BeforeAll", e);

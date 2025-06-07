@@ -1,8 +1,10 @@
-package it.einjojo.economy.redis;
+package it.einjojo.economy.notifier;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import it.einjojo.economy.EconomyNotifier;
 import it.einjojo.economy.exception.NotificationException;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
@@ -15,9 +17,9 @@ import java.util.UUID;
  * Handles publishing balance update notifications to Redis Pub/Sub.
  * Uses Jedis client pool for connection management.
  */
-public class RedisNotifier {
+public class JedisNotifier implements EconomyNotifier {
 
-    private static final Logger log = LoggerFactory.getLogger(RedisNotifier.class);
+    private static final Logger log = LoggerFactory.getLogger(JedisNotifier.class);
     private static final Gson gson = new Gson();
 
     private final JedisPool jedisPool;
@@ -29,7 +31,7 @@ public class RedisNotifier {
      * @param jedisPool     The pooled Jedis client instance. Must not be null.
      * @param pubSubChannel The Redis channel name to publish updates to. Must not be null or empty.
      */
-    public RedisNotifier(JedisPool jedisPool, String pubSubChannel) {
+    public JedisNotifier(JedisPool jedisPool, String pubSubChannel) {
         this.jedisPool = Objects.requireNonNull(jedisPool, "jedisPool cannot be null");
         this.pubSubChannel = Objects.requireNonNull(pubSubChannel, "pubSubChannel cannot be null");
         if (pubSubChannel.isBlank()) {
@@ -50,7 +52,7 @@ public class RedisNotifier {
      * @param change     The amount that was added (positive) or removed (negative).
      * @throws NotificationException If publishing fails (optional, depending on desired error handling).
      */
-    public void publishUpdate(UUID playerUuid, double newBalance, double change) throws NotificationException {
+    public void publishUpdate(@NotNull UUID playerUuid, double newBalance, double change) throws NotificationException {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
 
         JsonObject payload = new TransactionPayload(playerUuid, newBalance, change, System.currentTimeMillis()).toJson();
@@ -83,8 +85,8 @@ public class RedisNotifier {
      *
      * @return new instance
      */
-    public RedisTransactionObserver createTransactionObserver() {
-        return new RedisTransactionObserver(jedisPool.getResource(), pubSubChannel);
+    public JedisTransactionObserver createTransactionObserver() {
+        return new JedisTransactionObserver(jedisPool.getResource(), pubSubChannel);
     }
 
 
