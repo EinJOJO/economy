@@ -90,11 +90,15 @@ publishing {
         maven {
             name = "einjojoReleases"
             url = uri("https://repo.einjojo.it/releases")
-            credentials(PasswordCredentials::class)
+            credentials {
+                username = System.getenv("REPO_USERNAME")
+                password = System.getenv("REPO_PASSWORD")
+            }
             authentication {
                 create<BasicAuthentication>("basic")
             }
         }
     }
 }
+
 
