@@ -2,6 +2,7 @@ package it.einjojo.economy;
 
 import it.einjojo.economy.db.AccountData;
 import it.einjojo.economy.db.EconomyRepository;
+import it.einjojo.economy.db.PostgresEconomyRepository;
 import it.einjojo.economy.exception.EconomyException;
 import it.einjojo.economy.notifier.JedisNotifier;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +42,7 @@ public class AsyncEconomyService implements EconomyService {
      * @param repository           The data access repository.
      * @param notifier             notification publisher can be null.
      * @param dbExecutor           An ExecutorService dedicated to running blocking database operations.
-     * @param notificationExecutor An ExecutorService for running notification tasks (can be same as dbExecutor).
+     * @param notificationExecutor An ExecutorService for running notification tasks (can be the same as dbExecutor).
      * @param maxRetries           Maximum number of retries for withdrawals on concurrency conflicts.
      * @param retryDelayMillis     Delay between retry attempts in milliseconds.
      */
@@ -57,8 +58,6 @@ public class AsyncEconomyService implements EconomyService {
         this.notificationExecutor = Objects.requireNonNull(notificationExecutor, "notificationExecutor cannot be null");
         this.maxRetries = Math.max(0, maxRetries); // Ensure non-negative
         this.retryDelayMillis = Math.max(0, retryDelayMillis); // Ensure non-negative
-        log.info("AsyncEconomyService initialized. Max Retries: {}, Retry Delay: {}ms", this.maxRetries, this.retryDelayMillis);
-
     }
 
     /**
@@ -100,6 +99,10 @@ public class AsyncEconomyService implements EconomyService {
      * @return A CompletableFuture that completes when the service is ready to accept requests.
      */
     public CompletableFuture<Void> initialize() {
+        if (repository instanceof PostgresEconomyRepository economyRepository) {
+            log.warn("Provided a initialized instance of repository. Skipping init.");
+            if (economyRepository.isInit()) return CompletableFuture.completedFuture(null);
+        }
         log.info("Initializing Economy Service asynchronously...");
         // Run ensureSchemaExists on the DB executor
         return runAsync(repository::init, dbExecutor)
@@ -144,6 +147,12 @@ public class AsyncEconomyService implements EconomyService {
     }
 
 
+    private void publishNotification(UUID playerUuid, double newBalance, double amount) {
+        if (notifier != null) {
+            notifier.publishUpdate(playerUuid, newBalance, amount);
+        }
+    }
+
     public CompletableFuture<TransactionResult> deposit(@NotNull UUID playerUuid, double amount, @NotNull String reason) {
         Objects.requireNonNull(playerUuid, "playerUuid cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
@@ -161,7 +170,7 @@ public class AsyncEconomyService implements EconomyService {
                     runAsync(() -> {
                         repository.createLogEntry(playerUuid, accountData.version(), amount, reason);
                         log.debug("Notification task started for deposit UUID: {}", playerUuid);
-                        notifier.publishUpdate(playerUuid, accountData.balance(), amount);
+                        publishNotification(playerUuid, accountData.balance(), amount);
                         log.debug("Notification task finished for deposit UUID: {}", playerUuid);
                     }, notificationExecutor);
                     log.info("Deposit successful for {}. Amount: {}. New Balance: {}. Reason: {}", playerUuid, amount, accountData.balance(), reason);
@@ -195,7 +204,7 @@ public class AsyncEconomyService implements EconomyService {
                                 double changeForNotificationAndLog = accountData.balance() - oldBalance;
                                 runAsync(() -> {
                                     repository.createLogEntry(playerUuid, accountData.version(), changeForNotificationAndLog, reason);
-                                    notifier.publishUpdate(playerUuid, accountData.balance(), changeForNotificationAndLog);
+                                    publishNotification(playerUuid, accountData.balance(), changeForNotificationAndLog);
                                 }, notificationExecutor);
                                 log.info("SetBalance successful for {}. New Balance: {}. Reason: {}", playerUuid, accountData.balance(), reason);
                                 writeCacheIfAvailable(playerUuid, accountData.balance());
@@ -256,7 +265,7 @@ public class AsyncEconomyService implements EconomyService {
                                     // 5a. Success: Log, Notify and return result
                                     runAsync(() -> {
                                         repository.createLogEntry(playerUuid, newVersion, -amount, reason);
-                                        notifier.publishUpdate(playerUuid, newBalance, -amount);
+                                        publishNotification(playerUuid, newBalance, -amount);
                                     }, notificationExecutor);
                                     writeCacheIfAvailable(playerUuid, newBalance);
                                     log.info("Withdrawal successful for {}. Amount: {}. New Balance: {}. Reason: {}", playerUuid, amount, newBalance, reason);
@@ -299,7 +308,7 @@ public class AsyncEconomyService implements EconomyService {
      *
      * @param syncCache cache
      */
-    public void setSyncCache(EconomyCache syncCache) {
+    public void setSyncCache(@Nullable EconomyCache syncCache) {
         this.syncCache = syncCache;
     }
 
@@ -317,7 +326,7 @@ public class AsyncEconomyService implements EconomyService {
      *
      * @return Notifier object
      */
-    public EconomyNotifier getNotifier() {
+    public @Nullable EconomyNotifier getNotifier() {
         return notifier;
     }
 

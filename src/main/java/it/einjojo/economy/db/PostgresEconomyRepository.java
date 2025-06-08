@@ -38,6 +38,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
     private final String upsertIncrementSql;
     private final String insertLogEntrySql; // Renamed from createLogEntry for clarity
     private final String getLogEntriesSql; // New field for selecting log entries
+    private boolean init = false;
 
 
     /**
@@ -157,6 +158,7 @@ public class PostgresEconomyRepository implements EconomyRepository {
             } catch (SQLException e) {
                 log.warn("Could not ensure trigger setup (might be permissions or syntax issue, or already exists): {}", e.getMessage());
             }
+            init = true;
         } catch (SQLException e) {
             log.error("Failed to ensure database schema", e);
             throw new RepositoryException("Failed to ensure database schema", e);
@@ -376,6 +378,15 @@ public class PostgresEconomyRepository implements EconomyRepository {
      */
     public String getLogTableName() {
         return logTableName;
+    }
+
+    /**
+     * Check if init() has been called.
+     *
+     * @return true if this instance has been initialized
+     */
+    public boolean isInit() {
+        return init;
     }
 }
 
